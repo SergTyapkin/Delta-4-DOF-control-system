@@ -1,4 +1,3 @@
-// src/Safety/EmergencySystem.h
 #pragma once
 
 #include <cstdint>

@@ -1,4 +1,3 @@
-// src/Core/Kinematics/Kinematics.cpp
 #include "Kinematics.h"
 #include "utils/Logger.h"
 #include <cmath>

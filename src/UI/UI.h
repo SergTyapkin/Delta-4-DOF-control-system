@@ -1,4 +1,3 @@
-// src/UI/UI.h
 #pragma once
 
 #include "../Core/Core.h"

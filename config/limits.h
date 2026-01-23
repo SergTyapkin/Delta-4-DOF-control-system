@@ -1,4 +1,3 @@
-// config/limits.h
 #pragma once
 
 #include "robot_params.h"

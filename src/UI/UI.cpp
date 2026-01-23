@@ -1,4 +1,3 @@
-// src/UI/UI.cpp
 #include "UI.h"
 #include "utils/Logger.h"
 #include <Arduino.h>

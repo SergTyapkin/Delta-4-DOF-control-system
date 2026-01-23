@@ -1,4 +1,3 @@
-// src/Core/TrajectoryGenerator.h
 #pragma once
 
 #include "utils/Vector3.h"

@@ -1,4 +1,3 @@
-// config/pins_config.h
 #pragma once
 
 #include <cstdint>

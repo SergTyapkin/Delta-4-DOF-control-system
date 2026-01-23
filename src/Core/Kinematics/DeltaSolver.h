@@ -1,4 +1,3 @@
-// src/Core/Kinematics/DeltaSolver.h
 #pragma once
 
 #include "utils/Vector3.h"

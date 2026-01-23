@@ -4,5 +4,6 @@
 *.so      # Shared libs
 *.d       # Dependency files (from -MMD)
 *.out     # Executables
+*.exe     # Executables
 *.elf     # Embedded binaries
 *.dSYM/   # macOS debug files

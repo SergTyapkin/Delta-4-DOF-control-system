@@ -1,4 +1,3 @@
-// src/Core/RobotState.cpp
 #include "RobotState.h"
 #include "utils/Logger.h"
 #include <Arduino.h>

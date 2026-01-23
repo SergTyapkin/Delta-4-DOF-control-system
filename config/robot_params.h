@@ -1,4 +1,3 @@
-// config/robot_params.h
 #pragma once
 
 #include <cstdint>

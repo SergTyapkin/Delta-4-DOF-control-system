@@ -1,4 +1,3 @@
-// src/Core/Kinematics/DeltaSolver.cpp
 #include "DeltaSolver.h"
 #include "utils/Logger.h"
 #include <cmath>

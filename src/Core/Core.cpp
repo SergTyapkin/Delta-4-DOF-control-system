@@ -1,4 +1,3 @@
-// src/Core/Core.cpp
 #include "Core.h"
 #include "utils/Logger.h"
 #include <Arduino.h>

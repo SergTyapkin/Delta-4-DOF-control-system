@@ -1,4 +1,3 @@
-// src/Safety/EmergencySystem.cpp
 #include "EmergencySystem.h"
 #include <Arduino.h>
 #include "utils/Logger.h"

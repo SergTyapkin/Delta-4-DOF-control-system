@@ -1,4 +1,3 @@
-// src/Core/TrajectoryGenerator.cpp
 #include "TrajectoryGenerator.h"
 #include "utils/Logger.h"
 #include <cmath>

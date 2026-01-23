@@ -1,4 +1,3 @@
-// src/Core/RobotState.h
 #pragma once
 
 #include "utils/Vector3.h"

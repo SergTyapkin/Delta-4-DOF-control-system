@@ -1,4 +1,3 @@
-// utils/MathUtils.h
 #pragma once
 
 #include <cmath>
