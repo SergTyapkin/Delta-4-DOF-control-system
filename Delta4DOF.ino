@@ -1,4 +1,4 @@
-#include "src/Scheduler/Scheduler.h"
+#include "src/Sheduler/Sheduler.h"
 #include "src/Safety/EmergencySystem.h"
 #include "src/Core/Core.h"
 #include "src/UI/UI.h"
@@ -28,12 +28,13 @@ UI userInterface;
 // ============================================================================
 
 // Задача безопасности - самый высокий приоритет (выполняется каждые 1 мс)
-void safetyTask(void* context) {
+bool safetyTask(void* context) {
   emergencySys.update();
+  return true;
 }
 
 // Задача управления приводами - высокий приоритет (500 Гц)
-void drivesControlTask(void* context) {
+bool drivesControlTask(void* context) {
   static uint32_t last_execution = 0;
   uint32_t current_time = micros();
   uint32_t delta_time = current_time - last_execution;
@@ -45,10 +46,11 @@ void drivesControlTask(void* context) {
     }
     last_execution = current_time;
   }
+  return true;
 }
 
 // Задача кинематики и планирования - средний приоритет (100 Гц)
-void kinematicsTask(void* context) {
+bool kinematicsTask(void* context) {
   static uint32_t last_execution = 0;
   uint32_t current_time = millis();
 
@@ -59,10 +61,11 @@ void kinematicsTask(void* context) {
     }
     last_execution = current_time;
   }
+  return true;
 }
 
 // Задача ядра системы - средний приоритет (50 Гц)
-void coreTask(void* context) {
+bool coreTask(void* context) {
   static uint32_t last_execution = 0;
   uint32_t current_time = millis();
 
@@ -72,10 +75,11 @@ void coreTask(void* context) {
     }
     last_execution = current_time;
   }
+  return true;
 }
 
 // Задача пользовательского интерфейса - низкий приоритет (20 Гц)
-void uiTask(void* context) {
+bool uiTask(void* context) {
   static uint32_t last_execution = 0;
   uint32_t current_time = millis();
 
@@ -91,10 +95,11 @@ void uiTask(void* context) {
     }
     last_execution = current_time;
   }
+  return true;
 }
 
 // Задача мониторинга и диагностики - низкий приоритет (5 Гц)
-void monitoringTask(void* context) {
+bool monitoringTask(void* context) {
   static uint32_t last_execution = 0;
   uint32_t current_time = millis();
 
@@ -110,6 +115,7 @@ void monitoringTask(void* context) {
 
     last_execution = current_time;
   }
+  return true;
 }
 
 // ============================================================================
@@ -410,13 +416,13 @@ void setup() {
     Logger::critical("SYSTEM INITIALIZATION FAILED!");
     while (1) {
       // Мигание светодиодом при ошибке
-      digitalWrite(LED_BUILTIN, HIGH);
+      digitalWrite(Pins::Status::LED_ERROR, HIGH);
       delay(100);
-      digitalWrite(LED_BUILTIN, LOW);
+      digitalWrite(Pins::Status::LED_ERROR, LOW);
       delay(100);
-      digitalWrite(LED_BUILTIN, HIGH);
+      digitalWrite(Pins::Status::LED_ERROR, HIGH);
       delay(100);
-      digitalWrite(LED_BUILTIN, LOW);
+      digitalWrite(Pins::Status::LED_ERROR, LOW);
       delay(1000);
     }
   }
@@ -553,8 +559,19 @@ void processDebugCommand(const String& command) {
     robotCore.printStatus();
   } else if (command == "reset") {
     Logger::info("Soft reset requested...");
-    ESP.restart(); // Для ESP платформ
-    // Для STM32: NVIC_SystemReset();
+    #ifdef __AVR__
+        asm("jmp 0");
+    #elif defined(ESP8266)
+        ESP.restart();
+    #elif defined(ESP32)
+        esp_restart();
+    #elif defined(STM32)
+        NVIC_SystemReset();
+    #else
+      // Для других платформ
+      __asm__ volatile ("dsb 0xF":::"memory");
+      __asm__ volatile ("wfi");
+    #endif
   } else {
     Logger::info("Unknown debug command: %s", command.c_str());
     Logger::info("Available debug commands:");

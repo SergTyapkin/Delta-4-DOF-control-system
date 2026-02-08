@@ -2,7 +2,7 @@
 
 #include <cstdint>
 #include <functional>
-#include "config/pins_config.h"
+#include "../../config/pins_config.h"
 
 class FeedbackReader {
 public:

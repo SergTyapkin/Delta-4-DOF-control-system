@@ -1,6 +1,6 @@
 #include "EmergencySystem.h"
 #include <Arduino.h>
-#include "utils/Logger.h"
+#include "../../src/utils/Logger.h"
 
 // Константы
 namespace {

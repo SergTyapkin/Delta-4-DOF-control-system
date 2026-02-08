@@ -29,40 +29,40 @@ namespace Limits {
   };
 
 // Глобальный экземпляр пределов рабочей зоны
-  constexpr WorkspaceLimits WORKSPACE;
+constexpr WorkspaceLimits WORKSPACE;
 
 // ----------------------------------------------------------------------------
 // Пределы углов шарниров (радианы)
 // ----------------------------------------------------------------------------
-  struct JointLimits {
-    float min_angle = RobotParams::JOINT_MIN_ANGLE * MathUtils::DEG_TO_RAD;
-    float max_angle = RobotParams::JOINT_MAX_ANGLE * MathUtils::DEG_TO_RAD;
+struct JointLimits {
+  float min_angle = RobotParams::JOINT_MIN_ANGLE * MathUtils::DEG_TO_RAD;
+  float max_angle = RobotParams::JOINT_MAX_ANGLE * MathUtils::DEG_TO_RAD;
 
-    // Запас безопасности от предельных положений (радианы)
-    float safety_margin = 0.087f; // ~5 градусов
+  // Запас безопасности от предельных положений (радианы)
+  float safety_margin = 0.087f; // ~5 градусов
 
-    // Получить безопасные пределы
-    float getSafeMin() const { return min_angle + safety_margin; }
-    float getSafeMax() const { return max_angle - safety_margin; }
+  // Получить безопасные пределы
+  float getSafeMin() const { return min_angle + safety_margin; }
+  float getSafeMax() const { return max_angle - safety_margin; }
 
-    // Проверка угла на допустимость
-    bool isAngleValid(float angle) const {
-      return (angle >= getSafeMin() && angle <= getSafeMax());
-    }
+  // Проверка угла на допустимость
+  bool isAngleValid(float angle) const {
+    return (angle >= getSafeMin() && angle <= getSafeMax());
+  }
 
-    // Ограничение угла безопасными пределами
-    float clampAngle(float angle) const {
-      if (angle < getSafeMin()) return getSafeMin();
-      if (angle > getSafeMax()) return getSafeMax();
-      return angle;
-    }
-  };
+  // Ограничение угла безопасными пределами
+  float clampAngle(float angle) const {
+    if (angle < getSafeMin()) return getSafeMin();
+    if (angle > getSafeMax()) return getSafeMax();
+    return angle;
+  }
+};
 
 // Пределы для каждого из трех шарниров
   constexpr JointLimits JOINT_LIMITS[3] = {
-  JointLimits(), // Шарнир 1
-  JointLimits(), // Шарнир 2
-  JointLimits()  // Шарнир 3
+  JointLimits{},
+JointLimits{},
+JointLimits{}
 };
 
 // ----------------------------------------------------------------------------

@@ -1,6 +1,6 @@
-#include "Scheduler.h"
+#include "Sheduler.h"
 #include <Arduino.h>
-#include "utils/Logger.h"
+#include "../../src/utils/Logger.h"
 #include <algorithm>
 
 // Макрос для измерения времени выполнения (в микросекундах)

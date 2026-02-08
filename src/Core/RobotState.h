@@ -1,8 +1,10 @@
 #pragma once
 
-#include "utils/Vector3.h"
+#include "../../src/utils/Vector3.h"
 #include <array>
 #include <cstdint>
+#include <string>
+
 
 struct RobotState {
   // Статус робота
@@ -123,21 +125,39 @@ struct RobotState {
       case Status::CALIBRATING: Serial.println("CALIBRATING"); break;
     }
 
-    Serial.printf("Position: (%.1f, %.1f, %.1f) mm\n",
-                  effector_position.x, effector_position.y, effector_position.z);
-    Serial.printf("Joints: (%.2f, %.2f, %.2f) deg\n",
-                  joint_positions[0] * 57.2958f,
-                  joint_positions[1] * 57.2958f,
-                  joint_positions[2] * 57.2958f);
-    Serial.printf("Velocity: %.1f mm/s, Progress: %.1f%%\n",
-                  current_velocity, movement_progress * 100);
-    Serial.printf("Homed: %s, Moving: %s, Paused: %s\n",
-                  is_homed ? "YES" : "NO",
-                  is_moving ? "YES" : "NO",
-                  is_paused ? "YES" : "NO");
+    Serial.print("Position: (");
+    Serial.print(effector_position.x, 1);
+    Serial.print(", ");
+    Serial.print(effector_position.y, 1);
+    Serial.print(", ");
+    Serial.print(effector_position.z, 1);
+    Serial.println(") mm");
+    Serial.print("Joints: (");
+    Serial.print(joint_positions[0] * 57.2958f, 2);
+    Serial.print(", ");
+    Serial.print(joint_positions[1] * 57.2958f, 2);
+    Serial.print(", ");
+    Serial.print(joint_positions[2] * 57.2958f, 2);
+    Serial.println(") deg");
+
+    Serial.print("Velocity: ");
+    Serial.print(current_velocity, 1);
+    Serial.print(" mm/s, Progress: ");
+    Serial.print(movement_progress * 100, 1);
+    Serial.println("%");
+
+    Serial.print("Homed: ");
+    Serial.print(is_homed ? "YES" : "NO");
+    Serial.print(", Moving: ");
+    Serial.print(is_moving ? "YES" : "NO");
+    Serial.print(", Paused: ");
+    Serial.println(is_paused ? "YES" : "NO");
 
     if (error_code != 0) {
-      Serial.printf("Error: %d - %s\n", error_code, error_message.c_str());
+      Serial.print("Error: ");
+      Serial.print(error_code);
+      Serial.print(" - ");
+      Serial.println(error_message);
     }
   }
 };

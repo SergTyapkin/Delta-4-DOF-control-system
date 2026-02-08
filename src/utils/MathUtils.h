@@ -5,6 +5,10 @@
 #include <algorithm>
 
 namespace MathUtils {
+  #undef PI
+  #undef TWO_PI
+  #undef DEG_TO_RAD
+  #undef RAD_TO_DEG
 
   // Константы
   constexpr float PI = 3.14159265358979323846f;

@@ -2,8 +2,8 @@
 
 #include <cstdint>
 #include <functional>
-#include "config/pins_config.h"
-#include "utils/MathUtils.h"
+#include "../../config/pins_config.h"
+#include "../../src/utils/MathUtils.h"
 
 class Drive {
 public:
@@ -24,6 +24,13 @@ public:
     HOMING_IN_PROGRESS,
     ERROR,
     LIMIT_TRIGGERED
+  };
+
+  // Направление homing
+  enum class HomingDirection {
+    POSITIVE,   // К положительному пределу
+    NEGATIVE,   // К отрицательному пределу
+    TO_LIMIT    // К концевику
   };
 
   // Конфигурация привода
@@ -67,13 +74,6 @@ public:
         homing_direction(HomingDirection::NEGATIVE),
         run_current(1.0f), hold_current(0.5f),
         backlash_compensation(0.0f), invert_direction(false) {}
-  };
-
-  // Направление homing
-  enum class HomingDirection {
-    POSITIVE,   // К положительному пределу
-    NEGATIVE,   // К отрицательному пределу
-    TO_LIMIT    // К концевику
   };
 
   // Параметры движения

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../Core/Core.h"
-#include "utils/CircularBuffer.h"
+#include "../../src/Core/Core.h"
+#include "../../src/utils/CircularBuffer.h"
 #include "CommandParser.h"
 #include <functional>
 #include <map>

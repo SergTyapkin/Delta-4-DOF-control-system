@@ -1,5 +1,5 @@
 #include "TrajectoryGenerator.h"
-#include "utils/Logger.h"
+#include "../../src/utils/Logger.h"
 #include <cmath>
 
 TrajectoryGenerator::TrajectoryGenerator() :

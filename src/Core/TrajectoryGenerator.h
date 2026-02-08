@@ -1,8 +1,8 @@
 #pragma once
 
-#include "utils/Vector3.h"
-#include "utils/MathUtils.h"
-#include "config/limits.h"
+#include "../../src/utils/Vector3.h"
+#include "../../src/utils/MathUtils.h"
+#include "../../config/limits.h"
 #include <vector>
 
 enum class TrajectoryType {

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "DeltaSolver.h"
-#include "utils/Vector3.h"
-#include "config/limits.h"
+#include "../../../src/utils/Vector3.h"
+#include "../../../config/limits.h"
 
 class Kinematics {
 public:

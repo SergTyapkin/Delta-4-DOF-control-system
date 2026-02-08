@@ -1,5 +1,5 @@
 #include "RobotState.h"
-#include "utils/Logger.h"
+#include "../../src/utils/Logger.h"
 #include <Arduino.h>
 
 // Методы RobotState уже определены inline в заголовочном файле,

@@ -1,5 +1,5 @@
 #include "UI.h"
-#include "utils/Logger.h"
+#include "../../src/utils/Logger.h"
 #include <Arduino.h>
 
 UI::UI() :
@@ -270,11 +270,19 @@ void UI::printStatus() const {
     case Mode::CONFIG: mode_str = "CONFIG"; break;
   }
 
-  Serial.printf("Mode: %s\n", mode_str.c_str());
-  Serial.printf("Commands processed: %d\n", commands_processed_);
-  Serial.printf("Errors: %d\n", errors_count_);
-  Serial.printf("Command history: %d/%d\n",
-                command_history_.size(), command_history_.capacity());
+  Serial.print("Mode: ");
+  Serial.println(mode_str.c_str());
+
+  Serial.println("Commands processed:");
+  Serial.println(commands_processed_);
+
+  Serial.println("Errors:");
+  Serial.println(errors_count_);
+
+  Serial.println("Command history:");
+  Serial.print(command_history_.size());
+  Serial.print("/");
+  Serial.print(command_history_.capacity());
 }
 
 void UI::listCommands() const {
@@ -283,12 +291,13 @@ void UI::listCommands() const {
   for (const auto& pair : commands_) {
     const UICommand& cmd = pair.second;
 
-    Serial.printf("%-20s - %s\n",
-                  cmd.name.c_str(),
-                  cmd.description.c_str());
+    Serial.print(cmd.name.c_str(), 20);
+    Serial.print(" - ");
+    Serial.println(cmd.description.c_str());
   }
 
-  Serial.printf("Total: %d commands\n", commands_.size());
+  Serial.print("Total commands: ");
+  Serial.println(commands_.size());
 }
 
 void UI::setupDefaultCommands() {

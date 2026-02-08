@@ -1,13 +1,13 @@
 #pragma once
 
 #include <cstdint>
-#include "config/pins_config.h"
+#include "../../config/pins_config.h"
 
 class EmergencySystem {
 public:
   // Коды ошибок
   enum class ErrorCode : uint16_t {
-    NONE                = 0x0000,
+    NONE               = 0x0000,
     ESTOP_BUTTON       = 0x0001,  // Нажата аварийная кнопка
     LIMIT_SWITCH_1     = 0x0002,  // Сработал концевик 1
     LIMIT_SWITCH_2     = 0x0004,  // Сработал концевик 2
@@ -23,7 +23,9 @@ public:
     OVERVOLTAGE        = 0x1000,  // Высокое напряжение
     KINEMATICS_ERROR   = 0x2000,  // Ошибка кинематики
     COMMUNICATION_LOST = 0x4000,  // Потеря связи
-    WATCHDOG_TIMEOUT   = 0x8000   // Таймаут watchdog
+    WATCHDOG_TIMEOUT   = 0x8000,  // Таймаут watchdog
+    CORE_INIT_FAILED   = 0x7000,  // Ошибка инициализации ядра системы
+    HOMING_FAILED      = 0x6000   // Не удалась калибровка
   };
 
   // Состояния системы

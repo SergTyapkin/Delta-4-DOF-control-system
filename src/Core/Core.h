@@ -1,12 +1,13 @@
 #pragma once
 
-#include "Kinematics/DeltaSolver.h"
-#include "../DrivesController/DrivesController.h"
+#include "../../src/Core/Kinematics/DeltaSolver.h"
+#include "../../src/DrivesController/DrivesController.h"
 #include "RobotState.h"
 #include "TrajectoryGenerator.h"
-#include "utils/CircularBuffer.h"
-#include "config/limits.h"
+#include "../../src/utils/CircularBuffer.h"
+#include "../../config/limits.h"
 #include <functional>
+#include <map>
 
 class Core {
 public:

@@ -1,7 +1,7 @@
 #include "Drive.h"
 #include <Arduino.h>
-#include "utils/Logger.h"
-#include "utils/MathUtils.h"
+#include "../../src/utils/Logger.h"
+#include "../../src/utils/MathUtils.h"
 #include <cmath>
 
 // Макросы для быстрого управления пинами

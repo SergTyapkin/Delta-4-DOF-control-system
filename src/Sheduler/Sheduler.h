@@ -105,6 +105,9 @@ public:
   // Возобновление после экстренной остановки
   void resumeFromEmergency();
 
+  // Распечатать статистику выполнения задач
+  void printStatistics() const;
+
 private:
   // Массив задач
   Task tasks_[MAX_TASKS];
@@ -126,5 +129,4 @@ private:
   uint8_t findFreeTaskSlot() const;
   void sortTasksByPriority();
   void updateStatistics(uint32_t task_index, uint32_t execution_time);
-  void printStatistics() const;
 };
