@@ -1,5 +1,5 @@
-#include "EmergencySystem.h"
 #include <Arduino.h>
+#include "EmergencySystem.h"
 #include "../../src/utils/Logger.h"
 
 // Константы

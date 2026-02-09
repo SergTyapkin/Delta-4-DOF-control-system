@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <functional>
 
-class Scheduler {
+class Sheduler {
 public:
   // Максимальное количество задач
   static constexpr uint8_t MAX_TASKS = 16;
@@ -66,7 +66,7 @@ public:
   };
 
   // Конструктор
-  Scheduler();
+  Sheduler();
 
   // Инициализация
   void init();
@@ -128,5 +128,5 @@ private:
   // Приватные методы
   uint8_t findFreeTaskSlot() const;
   void sortTasksByPriority();
-  void updateStatistics(uint32_t task_index, uint32_t execution_time);
+  void updateStatistics(uint8_t task_index, uint32_t execution_time);
 };

@@ -1,6 +1,6 @@
+#include <Arduino.h>
 #include "DrivesController.h"
 #include "../../src/utils/Logger.h"
-#include <Arduino.h>
 
 DrivesController::DrivesController() :
     state_(State::IDLE),
@@ -446,6 +446,15 @@ bool DrivesController::isDriveMoving(uint8_t index) const {
   return drives_[index].isMoving();
 }
 
+bool DrivesController::isMoving() const {
+  for (const auto& drive : drives_) {
+    if (drive.isMoving()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool DrivesController::isHomingComplete() const {
   return (state_ != State::HOMING);
 }
@@ -630,7 +639,7 @@ bool DrivesController::checkDrivesReady() const {
 bool DrivesController::checkPositionsValid(const std::array<float, 3>& positions) const {
   for (uint8_t i = 0; i < 3; i++) {
     // Проверка на NaN и бесконечность
-    if (isnan(positions[i]) || isinf(positions[i])) {
+    if (std::isnan(positions[i]) || std::isinf(positions[i])) {
       Logger::error("Invalid position for drive %d: %f", i, positions[i]);
       return false;
     }
@@ -644,7 +653,7 @@ bool DrivesController::checkPositionsValid(const std::array<float, 3>& positions
 
 bool DrivesController::checkVelocitiesValid(const std::array<float, 3>& velocities) const {
   for (uint8_t i = 0; i < 3; i++) {
-    if (isnan(velocities[i]) || isinf(velocities[i])) {
+    if (std::isnan(velocities[i]) || std::isinf(velocities[i])) {
       Logger::error("Invalid velocity for drive %d: %f", i, velocities[i]);
       return false;
     }

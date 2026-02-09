@@ -1,8 +1,8 @@
-#include "Drive.h"
 #include <Arduino.h>
+#include <cmath>
+#include "Drive.h"
 #include "../../src/utils/Logger.h"
 #include "../../src/utils/MathUtils.h"
-#include <cmath>
 
 // Макросы для быстрого управления пинами
 #define SET_PIN(pin, value) digitalWrite(pin, value)
@@ -28,9 +28,8 @@ Drive::Drive() :
     step_interval_(0),
     last_step_time_(0),
     steps_to_execute_(0),
-    steps_executed_(0) {
-
-  current_profile_ = {0};
+    steps_executed_(0),
+    current_profile_{0, 0, 0, 0, 0, 0, 0, false} {
 }
 
 bool Drive::init(const Config& config, uint8_t drive_id) {

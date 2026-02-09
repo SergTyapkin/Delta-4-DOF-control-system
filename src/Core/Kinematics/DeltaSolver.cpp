@@ -1,6 +1,6 @@
+#include <cmath>
 #include "DeltaSolver.h"
 #include "../../../src/utils/Logger.h"
-#include <cmath>
 
 DeltaSolver::DeltaSolver() {
   init(DeltaConfig()); // Инициализация конфигурацией по умолчанию
@@ -136,7 +136,7 @@ DeltaSolver::Solution DeltaSolver::inverseKinematics(const Vector3& position) {
     if (!isSolutionPhysical(solution.angles[i], i)) {
       solution.valid = false;
       solution.error_code = 2;
-      solution.error_message = solution.angles[i];
+      solution.error_message = Utils::toString(solution.angles[i]);
       return solution;
     }
   }
@@ -221,7 +221,7 @@ DeltaSolver::Solution DeltaSolver::inverseKinematicsSafe(const Vector3& position
     if (!Limits::JOINT_LIMITS[i].isAngleValid(solution.angles[i])) {
       solution.valid = false;
       solution.error_code = 3;
-      solution.error_message = solution.angles[i];
+      solution.error_message = Utils::toString(solution.angles[i]);
 
       Logger::warning("IK unsafe: angle %d (%.2f deg) out of limits",
                       i, MathUtils::toDegrees(solution.angles[i]));
@@ -429,15 +429,16 @@ float DeltaSolver::calculateJointDistance(const Vector3& upper_joint,
 
 bool DeltaSolver::isSolutionPhysical(float angle, int arm_index) {
   // Проверка на NaN
-  if (isnan(angle)) {
+  if (std::isnan(angle)) {
     return false;
   }
 
   // Проверка на конечность
-  if (!isfinite(angle)) {
+  if (!std::isfinite(angle)) {
     return false;
   }
 
+  #undef PI
   // Проверка на разумные пределы
   if (angle < -MathUtils::PI || angle > MathUtils::PI) {
     return false;

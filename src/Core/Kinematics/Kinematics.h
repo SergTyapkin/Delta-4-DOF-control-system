@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include "DeltaSolver.h"
 #include "../../../src/utils/Vector3.h"
 #include "../../../config/limits.h"
@@ -11,7 +12,7 @@ public:
     bool valid;
     std::array<float, 3> joint_angles; // В радианах
     uint16_t error_code;
-    String error_message;
+    std::string error_message;
 
     Result() : valid(false), error_code(0) {
       joint_angles.fill(0);
@@ -36,7 +37,7 @@ public:
   Result inverseSafe(const Vector3& position);
 
   // Проверка достижимости точки
-  bool isReachable(const Vector3& position) const;
+  bool isReachable(const Vector3& position);
 
   // Проверка безопасности точки
   bool isSafe(const Vector3& position) const;

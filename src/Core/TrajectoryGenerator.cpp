@@ -1,6 +1,6 @@
+#include <cmath>
 #include "TrajectoryGenerator.h"
 #include "../../src/utils/Logger.h"
-#include <cmath>
 
 TrajectoryGenerator::TrajectoryGenerator() :
     type_(TrajectoryType::LINEAR),
@@ -12,9 +12,8 @@ TrajectoryGenerator::TrajectoryGenerator() :
     is_finished_(false),
     current_point_index_(0),
     current_time_(0),
-    total_time_(0) {
-
-  current_profile_ = {0};
+    total_time_(0),
+    current_profile_{0, 0, 0, 0, 0, 0, 0, 0, 0, false} {
 }
 
 bool TrajectoryGenerator::generate(const Vector3& start, const Vector3& end) {
@@ -235,7 +234,7 @@ void TrajectoryGenerator::reset() {
   is_running_ = false;
   is_paused_ = false;
   is_finished_ = false;
-  current_profile_ = {0};
+  current_profile_ = {0, 0, 0, 0, 0, 0, 0, 0, 0, false};
 }
 
 void TrajectoryGenerator::generateLinearTrajectory(const Vector3& start, const Vector3& end) {
@@ -325,7 +324,7 @@ Vector3 TrajectoryGenerator::interpolateLinear(float t) const {
 
   // Для нескольких точек - интерполяция по отрезкам
   float segment_length = 1.0f / (trajectory_points_.size() - 1);
-  int segment = static_cast<int>(t / segment_length);
+  size_t segment = static_cast<int>(t / segment_length);
 
   if (segment >= trajectory_points_.size() - 1) {
     return trajectory_points_.back();

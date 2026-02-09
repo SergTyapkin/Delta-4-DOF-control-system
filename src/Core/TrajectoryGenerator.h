@@ -1,9 +1,9 @@
 #pragma once
 
+#include <vector>
 #include "../../src/utils/Vector3.h"
 #include "../../src/utils/MathUtils.h"
 #include "../../config/limits.h"
-#include <vector>
 
 enum class TrajectoryType {
   LINEAR,     // Линейная интерполяция

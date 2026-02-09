@@ -1,14 +1,14 @@
-#include "Sheduler.h"
 #include <Arduino.h>
-#include "../../src/utils/Logger.h"
 #include <algorithm>
+#include "Sheduler.h"
+#include "../../src/utils/Logger.h"
 
 // Макрос для измерения времени выполнения (в микросекундах)
 #define TIME_TASK_START() uint32_t task_start = micros()
 #define TIME_TASK_END()   uint32_t task_end = micros()
 #define GET_TASK_TIME()   (task_end - task_start)
 
-Scheduler::Scheduler()
+Sheduler::Sheduler()
     : task_count_(0)
     , next_task_id_(1)
     , total_run_time_(0)
@@ -18,18 +18,18 @@ Scheduler::Scheduler()
     , emergency_time_(0) {
 }
 
-void Scheduler::init() {
-  Logger::info("Initializing Task Scheduler...");
+void Sheduler::init() {
+  Logger::info("Initializing Task Sheduler...");
 
   // Инициализация массива задач
   for (auto& task : tasks_) {
     task = Task();
   }
 
-  Logger::info("Scheduler ready. Max tasks: %d", MAX_TASKS);
+  Logger::info("Sheduler ready. Max tasks: %d", MAX_TASKS);
 }
 
-bool Scheduler::addTask(std::function<bool(void*)> func, void* context,
+bool Sheduler::addTask(std::function<bool(void*)> func, void* context,
                         uint32_t period_ms, Priority priority,
                         bool enabled, bool one_shot) {
 
@@ -72,7 +72,7 @@ bool Scheduler::addTask(std::function<bool(void*)> func, void* context,
   return true;
 }
 
-bool Scheduler::removeTask(uint8_t task_id) {
+bool Sheduler::removeTask(uint8_t task_id) {
   for (uint8_t i = 0; i < MAX_TASKS; i++) {
     if (tasks_[i].id == task_id) {
       Logger::debug("Removing task ID=%d", task_id);
@@ -92,7 +92,7 @@ bool Scheduler::removeTask(uint8_t task_id) {
   return false;
 }
 
-bool Scheduler::suspendTask(uint8_t task_id) {
+bool Sheduler::suspendTask(uint8_t task_id) {
   for (auto& task : tasks_) {
     if (task.id == task_id && task.status != TaskStatus::SUSPENDED) {
       task.status = TaskStatus::SUSPENDED;
@@ -103,7 +103,7 @@ bool Scheduler::suspendTask(uint8_t task_id) {
   return false;
 }
 
-bool Scheduler::resumeTask(uint8_t task_id) {
+bool Sheduler::resumeTask(uint8_t task_id) {
   for (auto& task : tasks_) {
     if (task.id == task_id && task.status == TaskStatus::SUSPENDED) {
       task.status = TaskStatus::READY;
@@ -115,7 +115,7 @@ bool Scheduler::resumeTask(uint8_t task_id) {
   return false;
 }
 
-void Scheduler::run() {
+void Sheduler::run() {
   if (emergency_stop_) {
     // В режиме экстренной остановки выполняем только критические задачи
     for (uint8_t i = 0; i < MAX_TASKS; i++) {
@@ -200,7 +200,7 @@ void Scheduler::run() {
   }
 }
 
-uint8_t Scheduler::findFreeTaskSlot() const {
+uint8_t Sheduler::findFreeTaskSlot() const {
   for (uint8_t i = 0; i < MAX_TASKS; i++) {
     if (tasks_[i].id == 0) {
       return i;
@@ -209,7 +209,7 @@ uint8_t Scheduler::findFreeTaskSlot() const {
   return 255; // Нет свободных слотов
 }
 
-void Scheduler::sortTasksByPriority() {
+void Sheduler::sortTasksByPriority() {
   // Сортировка пузырьком по приоритету (высокий приоритет - первые)
   for (uint8_t i = 0; i < MAX_TASKS - 1; i++) {
     for (uint8_t j = 0; j < MAX_TASKS - i - 1; j++) {
@@ -225,22 +225,22 @@ void Scheduler::sortTasksByPriority() {
   }
 }
 
-void Scheduler::updateStatistics(uint8_t task_index, uint32_t execution_time) {
+void Sheduler::updateStatistics(uint8_t task_index, uint32_t execution_time) {
   tasks_[task_index].total_execution_time += execution_time;
   if (execution_time > tasks_[task_index].max_execution_time) {
     tasks_[task_index].max_execution_time = execution_time;
   }
 }
 
-float Scheduler::getCpuLoad() const {
+float Sheduler::getCpuLoad() const {
   if (total_run_time_ == 0) return 0.0f;
 
   uint32_t busy_time = total_run_time_ - idle_time_;
   return (busy_time * 100.0f) / total_run_time_;
 }
 
-void Scheduler::printStatistics() const {
-  Logger::info("=== Scheduler Statistics ===");
+void Sheduler::printStatistics() const {
+  Logger::info("=== Sheduler Statistics ===");
   Logger::info("CPU Load: %.1f%%", getCpuLoad());
   Logger::info("Active tasks: %d/%d", task_count_, MAX_TASKS);
 
@@ -257,7 +257,7 @@ void Scheduler::printStatistics() const {
   }
 }
 
-void Scheduler::resetStatistics() {
+void Sheduler::resetStatistics() {
   total_run_time_ = 0;
   idle_time_ = 0;
   last_statistics_time_ = millis();
@@ -270,10 +270,10 @@ void Scheduler::resetStatistics() {
     }
   }
 
-  Logger::info("Scheduler statistics reset");
+  Logger::info("Sheduler statistics reset");
 }
 
-const Scheduler::Task* Scheduler::getTaskInfo(uint8_t task_id) const {
+const Sheduler::Task* Sheduler::getTaskInfo(uint8_t task_id) const {
   for (const auto& task : tasks_) {
     if (task.id == task_id) {
       return &task;
@@ -282,7 +282,7 @@ const Scheduler::Task* Scheduler::getTaskInfo(uint8_t task_id) const {
   return nullptr;
 }
 
-void Scheduler::emergencyStop() {
+void Sheduler::emergencyStop() {
   if (!emergency_stop_) {
     emergency_stop_ = true;
     emergency_time_ = millis();
@@ -294,11 +294,11 @@ void Scheduler::emergencyStop() {
       }
     }
 
-    Logger::critical("Scheduler: EMERGENCY STOP activated");
+    Logger::critical("Sheduler: EMERGENCY STOP activated");
   }
 }
 
-void Scheduler::resumeFromEmergency() {
+void Sheduler::resumeFromEmergency() {
   if (emergency_stop_) {
     emergency_stop_ = false;
 
@@ -311,6 +311,6 @@ void Scheduler::resumeFromEmergency() {
     }
 
     uint32_t emergency_duration = millis() - emergency_time_;
-    Logger::info("Scheduler: Emergency cleared after %d ms", emergency_duration);
+    Logger::info("Sheduler: Emergency cleared after %d ms", emergency_duration);
   }
 }

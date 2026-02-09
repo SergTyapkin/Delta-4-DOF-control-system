@@ -2,17 +2,18 @@
 #include "src/Safety/EmergencySystem.h"
 #include "src/Core/Core.h"
 #include "src/UI/UI.h"
+#include "src/utils/Logger.h"
+
 #include "config/pins_config.h"
 #include "config/robot_params.h"
 #include "config/limits.h"
-#include "src/utils/Logger.h"
 
 // ============================================================================
 // Глобальные экземпляры компонентов системы
 // ============================================================================
 
 // 1. Планировщик задач - сердце real-time системы
-Scheduler taskScheduler;
+Sheduler taskSheduler;
 
 // 2. Система безопасности - высший приоритет
 EmergencySystem emergencySys;
@@ -128,7 +129,7 @@ void emergencyCallback(EmergencySystem::ErrorCode error, void* context) {
                    static_cast<uint16_t>(error));
 
   // Останавливаем все задачи кроме критических
-  taskScheduler.emergencyStop();
+  taskSheduler.emergencyStop();
 
   // Отправляем сообщение в UI
   userInterface.sendMessage("EMERGENCY STOP ACTIVATED", true);
@@ -295,27 +296,27 @@ bool initializeSystem() {
   Logger::info("User Interface: READY");
 
   // Шаг 4: Настройка планировщика задач
-  Logger::info("Step 4: Setting up Task Scheduler...");
-  taskScheduler.init();
+  Logger::info("Step 4: Setting up Task Sheduler...");
+  taskSheduler.init();
 
   // Добавление задач с приоритетами:
   // 10 (высший) - 1 (низший)
 
   // Критические задачи
-  taskScheduler.addTask(safetyTask, nullptr, 1, Scheduler::PRIORITY_CRITICAL);
+  taskSheduler.addTask(safetyTask, nullptr, 1, Sheduler::PRIORITY_CRITICAL);
 
   // Высокоприоритетные задачи (управление)
-  taskScheduler.addTask(drivesControlTask, nullptr, 2, Scheduler::PRIORITY_HIGH);
+  taskSheduler.addTask(drivesControlTask, nullptr, 2, Sheduler::PRIORITY_HIGH);
 
   // Среднеприоритетные задачи (планирование)
-  taskScheduler.addTask(kinematicsTask, nullptr, 10, Scheduler::PRIORITY_MEDIUM);
-  taskScheduler.addTask(coreTask, nullptr, 20, Scheduler::PRIORITY_MEDIUM);
+  taskSheduler.addTask(kinematicsTask, nullptr, 10, Sheduler::PRIORITY_MEDIUM);
+  taskSheduler.addTask(coreTask, nullptr, 20, Sheduler::PRIORITY_MEDIUM);
 
   // Низкоприоритетные задачи (UI, мониторинг)
-  taskScheduler.addTask(uiTask, nullptr, 50, Scheduler::PRIORITY_LOW);
-  taskScheduler.addTask(monitoringTask, nullptr, 200, Scheduler::PRIORITY_IDLE);
+  taskSheduler.addTask(uiTask, nullptr, 50, Sheduler::PRIORITY_LOW);
+  taskSheduler.addTask(monitoringTask, nullptr, 200, Sheduler::PRIORITY_IDLE);
 
-  Logger::info("Task Scheduler: READY (%d tasks configured)", taskScheduler.getTaskCount());
+  Logger::info("Task Sheduler: READY (%d tasks configured)", taskSheduler.getTaskCount());
 
   return true;
 }
@@ -387,6 +388,115 @@ bool performStartupSequence() {
   return true;
 }
 
+
+// Функция аварийного восстановления
+void emergencyRecovery() {
+  Logger::critical("ATTEMPTING EMERGENCY RECOVERY...");
+
+  // 1. Сброс аварийного состояния безопасности
+  if (!emergencySys.reset()) {
+    Logger::error("Cannot reset emergency state - check hardware");
+    return;
+  }
+
+  // 2. Сброс планировщика
+  taskSheduler.resumeFromEmergency();
+
+  // 3. Сброс ядра робота
+  robotCore.reset();
+
+  // 4. Повторный homing
+  if (performStartupSequence()) {
+    Logger::info("EMERGENCY RECOVERY SUCCESSFUL");
+    userInterface.sendMessage("System recovered from emergency", false);
+  } else {
+    Logger::error("EMERGENCY RECOVERY FAILED");
+  }
+}
+
+// Функция для диагностики системы
+void runDiagnostics() {
+  Logger::info("=== SYSTEM DIAGNOSTICS ===");
+
+  // 1. Проверка напряжения
+  float voltage = emergencySys.getSupplyVoltage();
+  Logger::info("Supply voltage: %.1f V", voltage);
+
+  // 2. Проверка состояния приводов
+  Logger::info("Drive states:");
+  for (int i = 0; i < 3; i++) {
+    // Здесь нужно получить состояние каждого привода через Core
+    Logger::info("  Drive %d: [status]", i);
+  }
+
+  // 3. Проверка кинематики
+  Logger::info("Kinematics test:");
+  Vector3 test_point(0, 0, -500);
+  if (robotCore.moveToPoint(test_point, 10.0f)) {
+    Logger::info("  Test movement: OK");
+  } else {
+    Logger::error("  Test movement: FAILED");
+  }
+
+  // 4. Проверка планировщика
+  float cpu_load = taskSheduler.getCpuLoad();
+  Logger::info("CPU load: %.1f%%", cpu_load);
+
+  Logger::info("Diagnostics complete");
+}
+
+// Обработка команд из Serial для отладки
+void handleDebugCommands() {
+  static String debug_buffer = "";
+
+  while (Serial.available()) {
+    char c = Serial.read();
+
+    if (c == '\n' || c == '\r') {
+      if (debug_buffer.length() > 0) {
+        processDebugCommand(debug_buffer);
+        debug_buffer = "";
+      }
+    } else {
+      debug_buffer += c;
+    }
+  }
+}
+
+// Обработчик отладочных команд
+void processDebugCommand(const String& command) {
+  if (command == "diag") {
+    runDiagnostics();
+  } else if (command == "recover") {
+    emergencyRecovery();
+  } else if (command == "status") {
+    taskSheduler.printStatistics();
+    robotCore.printStatus();
+  } else if (command == "reset") {
+    Logger::info("Soft reset requested...");
+#ifdef __AVR__
+    asm("jmp 0");
+#elif defined(ESP8266)
+    ESP.restart();
+#elif defined(ESP32)
+    esp_restart();
+#elif defined(STM32)
+    NVIC_SystemReset();
+#else
+    // Для других платформ
+    __asm__ volatile ("dsb 0xF":::"memory");
+    __asm__ volatile ("wfi");
+#endif
+  } else {
+    Logger::info("Unknown debug command: %s", command.c_str());
+    Logger::info("Available debug commands:");
+    Logger::info("  diag    - Run diagnostics");
+    Logger::info("  recover - Emergency recovery");
+    Logger::info("  status  - System status");
+    Logger::info("  reset   - Soft reset");
+  }
+}
+
 // ============================================================================
 // Arduino стандартные функции
 // ============================================================================
@@ -449,135 +559,8 @@ void loop() {
   // Главный цикл - только запуск планировщика задач
   // Вся работа выполняется в задачах планировщика
 
-  taskScheduler.run();
+  taskSheduler.run();
 
   // Небольшая задержка для снижения нагрузки на CPU
-  // В реальной системе лучше использовать прерывания по таймеру
   delayMicroseconds(100);
-}
-
-// ============================================================================
-// Обработчики прерываний (если нужны)
-// ============================================================================
-
-// Пример обработчика прерывания от энкодера
-// void encoderISR() {
-//     // Обработка в соответствующем модуле
-// }
-
-// Пример обработчика прерывания от концевика
-// void limitSwitchISR() {
-//     emergencySys.handleLimitSwitch();
-// }
-
-// ============================================================================
-// Вспомогательные функции
-// ============================================================================
-
-// Функция для аварийного восстановления
-void emergencyRecovery() {
-  Logger::critical("ATTEMPTING EMERGENCY RECOVERY...");
-
-  // 1. Сброс аварийного состояния безопасности
-  if (!emergencySys.reset()) {
-    Logger::error("Cannot reset emergency state - check hardware");
-    return;
-  }
-
-  // 2. Сброс планировщика
-  taskScheduler.resumeFromEmergency();
-
-  // 3. Сброс ядра робота
-  robotCore.reset();
-
-  // 4. Повторный homing
-  if (performStartupSequence()) {
-    Logger::info("EMERGENCY RECOVERY SUCCESSFUL");
-    userInterface.sendMessage("System recovered from emergency", false);
-  } else {
-    Logger::error("EMERGENCY RECOVERY FAILED");
-  }
-}
-
-// Функция для диагностики системы
-void runDiagnostics() {
-  Logger::info("=== SYSTEM DIAGNOSTICS ===");
-
-  // 1. Проверка напряжения
-  float voltage = emergencySys.getSupplyVoltage();
-  Logger::info("Supply voltage: %.1f V", voltage);
-
-  // 2. Проверка состояния приводов
-  Logger::info("Drive states:");
-  for (int i = 0; i < 3; i++) {
-    // Здесь нужно получить состояние каждого привода через Core
-    Logger::info("  Drive %d: [status]", i);
-  }
-
-  // 3. Проверка кинематики
-  Logger::info("Kinematics test:");
-  Vector3 test_point(0, 0, -500);
-  if (robotCore.moveToPoint(test_point, 10.0f)) {
-    Logger::info("  Test movement: OK");
-  } else {
-    Logger::error("  Test movement: FAILED");
-  }
-
-  // 4. Проверка планировщика
-  float cpu_load = taskScheduler.getCpuLoad();
-  Logger::info("CPU load: %.1f%%", cpu_load);
-
-  Logger::info("Diagnostics complete");
-}
-
-// Обработка команд из Serial для отладки
-void handleDebugCommands() {
-  static String debug_buffer = "";
-
-  while (Serial.available()) {
-    char c = Serial.read();
-
-    if (c == '\n' || c == '\r') {
-      if (debug_buffer.length() > 0) {
-        processDebugCommand(debug_buffer);
-        debug_buffer = "";
-      }
-    } else {
-      debug_buffer += c;
-    }
-  }
-}
-
-// Обработчик отладочных команд
-void processDebugCommand(const String& command) {
-  if (command == "diag") {
-    runDiagnostics();
-  } else if (command == "recover") {
-    emergencyRecovery();
-  } else if (command == "status") {
-    taskScheduler.printStatistics();
-    robotCore.printStatus();
-  } else if (command == "reset") {
-    Logger::info("Soft reset requested...");
-    #ifdef __AVR__
-        asm("jmp 0");
-    #elif defined(ESP8266)
-        ESP.restart();
-    #elif defined(ESP32)
-        esp_restart();
-    #elif defined(STM32)
-        NVIC_SystemReset();
-    #else
-      // Для других платформ
-      __asm__ volatile ("dsb 0xF":::"memory");
-      __asm__ volatile ("wfi");
-    #endif
-  } else {
-    Logger::info("Unknown debug command: %s", command.c_str());
-    Logger::info("Available debug commands:");
-    Logger::info("  diag    - Run diagnostics");
-    Logger::info("  recover - Emergency recovery");
-    Logger::info("  status  - System status");
-    Logger::info("  reset   - Soft reset");
-  }
 }

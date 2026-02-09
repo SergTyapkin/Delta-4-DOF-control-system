@@ -25,7 +25,7 @@ public:
     COMMUNICATION_LOST = 0x4000,  // Потеря связи
     WATCHDOG_TIMEOUT   = 0x8000,  // Таймаут watchdog
     CORE_INIT_FAILED   = 0x7000,  // Ошибка инициализации ядра системы
-    HOMING_FAILED      = 0x6000   // Не удалась калибровка
+    HOMING_FAILED      = 0x6000   // Не удался поиск нуля
   };
 
   // Состояния системы

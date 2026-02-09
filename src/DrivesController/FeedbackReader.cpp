@@ -1,7 +1,7 @@
+#include <Arduino.h>
 #include "FeedbackReader.h"
 #include "../../src/utils/Logger.h"
 #include "../../src/utils/MathUtils.h"
-#include <Arduino.h>
 
 FeedbackReader::FeedbackReader() :
     reader_id_(0),
@@ -168,7 +168,7 @@ void FeedbackReader::handleInterrupt() {
     if (delta_time > 0 && delta_time < 1000000) { // Защита от переполнения
       // Минимальная скорость (если тик был, но время очень большое)
       float min_dt = 0.0001f; // 0.1 мс
-      float dt_s = max(delta_time / 1000000.0f, min_dt);
+      float dt_s = std::max(delta_time / 1000000.0f, min_dt);
 
       // Угловое перемещение за тик
       float angle_per_tick = (2.0f * MathUtils::PI) / config_.pulses_per_rev;

@@ -120,7 +120,7 @@ public:
   bool isMoving() const { return state_ == State::MOVING; }
   bool isEnabled() const { return enabled_; }
   bool isHomed() const { return is_homed_; }
-  bool isLimitTriggered() const;
+  bool isLimitTriggered();
 
   // Настройка параметров
   void setLimits(float min_position, float max_position);
@@ -214,6 +214,11 @@ private:
   float stepsToRadians(int32_t steps) const;
   int32_t radiansToSteps(float radians) const;
   uint32_t calculateStepInterval(float velocity_rad_s) const;
+
+  // Обработка сценариев
+  void handleHoming(uint32_t delta_time_ms);
+  void handlePositionControl(uint32_t delta_time_ms);
+  void handleVelocityControl(uint32_t delta_time_ms);
 
   // Обработка прерываний
   void handleLimitSwitch();

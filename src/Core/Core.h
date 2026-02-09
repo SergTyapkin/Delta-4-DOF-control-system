@@ -1,13 +1,15 @@
 #pragma once
 
-#include "../../src/Core/Kinematics/DeltaSolver.h"
-#include "../../src/DrivesController/DrivesController.h"
-#include "RobotState.h"
-#include "TrajectoryGenerator.h"
-#include "../../src/utils/CircularBuffer.h"
-#include "../../config/limits.h"
 #include <functional>
 #include <map>
+#include <string>
+#include "RobotState.h"
+#include "TrajectoryGenerator.h"
+#include "../../src/Core/Kinematics/DeltaSolver.h"
+#include "../../src/DrivesController/DrivesController.h"
+#include "../../src/utils/CircularBuffer.h"
+#include "../../src/utils/Utils.h"
+#include "../../config/limits.h"
 
 class Core {
 public:
@@ -88,7 +90,7 @@ public:
     uint32_t command_id;
     CommandStatus status;
     uint16_t error_code;
-    String error_message;
+    std::string error_message;
     uint32_t execution_time; // Время выполнения (мс)
 
     CommandResult() :
@@ -159,7 +161,7 @@ public:
   typedef std::function<void(const RobotState&)> StateUpdateCallback;
   typedef std::function<void(const CommandResult&)> CommandCompleteCallback;
   typedef std::function<void(Mode, Mode)> ModeChangeCallback;
-  typedef std::function<void(uint16_t, const String&)> ErrorCallback;
+  typedef std::function<void(uint16_t, const std::string&)> ErrorCallback;
 
   void setStateUpdateCallback(StateUpdateCallback callback);
   void setCommandCompleteCallback(CommandCompleteCallback callback);
@@ -233,10 +235,10 @@ private:
 
   // Вспомогательные методы
   bool convertToJointAngles(const Vector3& point, std::array<float, 3>& angles);
-  bool checkPointSafety(const Vector3& point) const;
-  bool checkJointSafety(const std::array<float, 3>& angles) const;
+  bool checkPointSafety(const Vector3& point);
+  bool checkJointSafety(const std::array<float, 3>& angles);
   void logCommand(const Command& cmd, CommandStatus status,
-                  uint16_t error_code = 0, const String& error_msg = "");
+                  uint16_t error_code = 0, const std::string& error_msg = "");
 
   // Обработчики событий от компонентов
   void onDriveStateChanged(uint8_t index, Drive::State old_state,

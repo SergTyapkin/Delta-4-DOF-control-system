@@ -1,10 +1,12 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
 #include "../../../src/utils/Vector3.h"
 #include "../../../src/utils/MathUtils.h"
+#include "../../../src/utils/Utils.h"
 #include "../../../config/robot_params.h"
 #include "../../../config/limits.h"
-#include <cstdint>
 
 class DeltaSolver {
 public:
@@ -40,7 +42,7 @@ public:
     float angles[3];          // Углы рычагов (радианы)
     bool valid;               // Решение валидно
     uint8_t error_code;       // Код ошибки
-    float error_message;      // Сообщение об ошибке (если есть)
+    std::string error_message;      // Сообщение об ошибке (если есть)
 
     Solution() : valid(false), error_code(0), error_message(0) {
       angles[0] = angles[1] = angles[2] = 0;
@@ -92,6 +94,12 @@ public:
   void getWorkspaceBounds(float& min_radius, float& max_radius,
                           float& min_z, float& max_z) const;
 
+  // Вычисление позиции шарнира верхнего рычага
+  Vector3 getUpperJointPosition(float angle, int arm_index) const;
+
+  // Вычисление позиции шарнира нижнего рычага на эффекторе
+  Vector3 getEffectorJointPosition(const Vector3& effector_pos, int arm_index) const;
+
 private:
   // Конфигурация робота
   DeltaConfig config_;
@@ -109,12 +117,6 @@ private:
 
   // Проверка решения на физическую реализуемость
   bool isSolutionPhysical(float angle, int arm_index);
-
-  // Вычисление позиции шарнира верхнего рычага
-  Vector3 getUpperJointPosition(float angle, int arm_index) const;
-
-  // Вычисление позиции шарнира нижнего рычага на эффекторе
-  Vector3 getEffectorJointPosition(const Vector3& effector_pos, int arm_index) const;
 
   // Расчет расстояния между шарнирами верхнего и нижнего рычагов
   float calculateJointDistance(const Vector3& upper_joint,

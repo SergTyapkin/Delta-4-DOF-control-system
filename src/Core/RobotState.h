@@ -1,9 +1,10 @@
 #pragma once
 
-#include "../../src/utils/Vector3.h"
 #include <array>
 #include <cstdint>
 #include <string>
+#include "../../src/utils/Vector3.h"
+#include "../../src/utils/Utils.h"
 
 
 struct RobotState {
@@ -41,7 +42,7 @@ struct RobotState {
 
   // Ошибки
   uint32_t error_code;
-  String error_message;
+  std::string error_message;
 
   // Временные метки
   uint32_t timestamp;         // Время последнего обновления (мс)
@@ -77,35 +78,35 @@ struct RobotState {
       is_emergency(false) {}
 
   // Метод для сериализации состояния (для передачи по Serial/Web)
-  String serialize() const {
-    String json = "{";
+  std::string serialize() const {
+    std::string json = "{";
 
-    json += "\"status\":" + String(static_cast<int>(status)) + ",";
-    json += "\"position\":{\"x\":" + String(effector_position.x, 2) +
-            ",\"y\":" + String(effector_position.y, 2) +
-            ",\"z\":" + String(effector_position.z, 2) + "},";
+    json += "\"status\":" + Utils::toString(static_cast<int>(status)) + ",";
+    json += "\"position\":{\"x\":" + std::string(effector_position.x, 2) +
+            ",\"y\":" + std::string(effector_position.y, 2) +
+            ",\"z\":" + std::string(effector_position.z, 2) + "},";
 
     json += "\"joints\":[" +
-            String(joint_positions[0], 4) + "," +
-            String(joint_positions[1], 4) + "," +
-            String(joint_positions[2], 4) + "],";
+            std::string(joint_positions[0], 4) + "," +
+            std::string(joint_positions[1], 4) + "," +
+            std::string(joint_positions[2], 4) + "],";
 
     json += "\"velocities\":[" +
-            String(joint_velocities[0], 4) + "," +
-            String(joint_velocities[1], 4) + "," +
-            String(joint_velocities[2], 4) + "],";
+            std::string(joint_velocities[0], 4) + "," +
+            std::string(joint_velocities[1], 4) + "," +
+            std::string(joint_velocities[2], 4) + "],";
 
-    json += "\"target\":{\"x\":" + String(target_position.x, 2) +
-            ",\"y\":" + String(target_position.y, 2) +
-            ",\"z\":" + String(target_position.z, 2) + "},";
+    json += "\"target\":{\"x\":" + std::string(target_position.x, 2) +
+            ",\"y\":" + std::string(target_position.y, 2) +
+            ",\"z\":" + std::string(target_position.z, 2) + "},";
 
-    json += "\"is_homed\":" + String(is_homed ? "true" : "false") + ",";
-    json += "\"is_moving\":" + String(is_moving ? "true" : "false") + ",";
-    json += "\"is_paused\":" + String(is_paused ? "true" : "false") + ",";
-    json += "\"velocity\":" + String(current_velocity, 2) + ",";
-    json += "\"progress\":" + String(movement_progress, 3) + ",";
-    json += "\"error_code\":" + String(error_code) + ",";
-    json += "\"timestamp\":" + String(timestamp);
+    json += "\"is_homed\":" + std::string(is_homed ? "true" : "false") + ",";
+    json += "\"is_moving\":" + std::string(is_moving ? "true" : "false") + ",";
+    json += "\"is_paused\":" + std::string(is_paused ? "true" : "false") + ",";
+    json += "\"velocity\":" + std::string(current_velocity, 2) + ",";
+    json += "\"progress\":" + std::string(movement_progress, 3) + ",";
+    json += "\"error_code\":" + Utils::toString(error_code) + ",";
+    json += "\"timestamp\":" + Utils::toString(timestamp);
 
     json += "}";
     return json;
@@ -157,7 +158,7 @@ struct RobotState {
       Serial.print("Error: ");
       Serial.print(error_code);
       Serial.print(" - ");
-      Serial.println(error_message);
+      Serial.println(error_message.c_str());
     }
   }
 };

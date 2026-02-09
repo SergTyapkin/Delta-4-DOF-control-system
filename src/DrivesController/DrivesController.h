@@ -1,8 +1,9 @@
 #pragma once
 
+#include <array>
+#include <cmath>
 #include "Drive.h"
 #include "../../src/utils/CircularBuffer.h"
-#include <array>
 
 class DrivesController {
 public:
@@ -118,6 +119,7 @@ public:
   bool isDriveEnabled(uint8_t index) const;
   bool isDriveHomed(uint8_t index) const;
   bool isDriveMoving(uint8_t index) const;
+  bool isMoving() const;
 
   // Статистика
   uint32_t getCommandsExecuted() const { return commands_executed_; }

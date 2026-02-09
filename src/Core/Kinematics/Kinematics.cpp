@@ -1,6 +1,7 @@
+#include <cmath>
+#include <string>
 #include "Kinematics.h"
 #include "../../../src/utils/Logger.h"
-#include <cmath>
 
 Kinematics::Kinematics() {
   // Конструктор по умолчанию
@@ -31,7 +32,7 @@ Kinematics::Result Kinematics::inverse(const Vector3& position) {
     result.joint_angles[2] = solution.angles[2];
   } else {
     result.error_code = solution.error_code;
-    result.error_message = String("IK failed: ") + solution.error_message;
+    result.error_message = std::string("IK failed: ") + solution.error_message;
   }
 
   return result;
@@ -71,13 +72,13 @@ Kinematics::Result Kinematics::inverseSafe(const Vector3& position) {
     }
   } else {
     result.error_code = solution.error_code;
-    result.error_message = String("IK failed: ") + solution.error_message;
+    result.error_message = std::string("IK failed: ") + solution.error_message;
   }
 
   return result;
 }
 
-bool Kinematics::isReachable(const Vector3& position) const {
+bool Kinematics::isReachable(const Vector3& position) {
   return solver_.isReachable(position);
 }
 

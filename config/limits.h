@@ -1,7 +1,7 @@
 #pragma once
 
-#include "robot_params.h"
 #include <cstdint>
+#include "robot_params.h"
 
 namespace Limits {
 
@@ -205,7 +205,7 @@ namespace SafetyCheck {
   }
 
   // Проверка углов шарниров на безопасность
-  static bool areJointAnglesSafe(float angles[3]) {
+  static bool areJointAnglesSafe(const float angles[3]) {
     for (int i = 0; i < 3; i++) {
       if (!JOINT_LIMITS[i].isAngleValid(angles[i])) {
         return false;

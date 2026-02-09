@@ -32,13 +32,14 @@ DeltaRobot/
 │ ├── UI/ # Пользовательский интерфейс
 │ │ ├── UI.h/cpp
 │ │ └── CommandParser.h/cpp # Парсер текстовых команд пользователя
-│ ├── Scheduler/ # Планировщик асинхронных задач
-│ │ └── Scheduler.h/cpp
+│ ├── Sheduler/ # Планировщик асинхронных задач
+│ │ └── Sheduler.h/cpp
 │ ├── Safety/ # Экстренная система безопасности
 │ │ └── EmergencySystem.h/cpp
 │ └── utils/ # Вспомогательные утилиты
 │   ├── Vector3.h
 │   ├── CircularBuffer.h # Асинхронный буфер хранения команд
+│   ├── Utils.h
 │   ├── MathUtils.h
 │   └── Logger.h
 └── config/ # Конфигурационные файлы
@@ -61,13 +62,14 @@ DeltaRobot/
    - `src/utils/Vector3.h` - 3D вектор
    - `src/utils/CircularBuffer.h` - кольцевой буфер команд
    - `src/utils/MathUtils.h` - математические функции
+   - `src/utils/Utils.h` - Прочие функции
    - `src/utils/Logger.h` - система логирования
 
 4. **Безопасность:**
    - `src/Safety/EmergencySystem.h/cpp` - система аварийной остановки
 
 5. **Планировщик:**
-   - `src/Scheduler/Scheduler.h/cpp` - планировщик задач
+   - `src/Sheduler/Sheduler.h/cpp` - планировщик задач
 
 6. **Кинематика:**
    - `src/Core/Kinematics/Kinematics.h/cpp` - решение обратной и прямой задач кинематики

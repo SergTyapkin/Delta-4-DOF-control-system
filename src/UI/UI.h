@@ -1,10 +1,13 @@
 #pragma once
 
-#include "../../src/Core/Core.h"
-#include "../../src/utils/CircularBuffer.h"
-#include "CommandParser.h"
+#include <Arduino.h>
 #include <functional>
 #include <map>
+#include <string>
+#include "CommandParser.h"
+#include "../../src/Core/Core.h"
+#include "../../src/utils/CircularBuffer.h"
+#include "../../src/utils/Logger.h"
 
 class UI {
 public:
@@ -43,9 +46,9 @@ public:
     };
 
     Type type;
-    String name;
-    String description;
-    std::function<bool(const String&)> handler;
+    std::string name;
+    std::string description;
+    std::function<bool(const std::string&)> handler;
   };
 
   // Конструктор
@@ -58,22 +61,22 @@ public:
   void update();
 
   // Обработка входящих данных
-  void processInput(const String& input);
+  void processInput(const std::string& input);
   void processInput(const char* input, size_t length);
 
   // Отправка состояния
   void sendState(const RobotState& state);
-  void sendMessage(const String& message, bool is_error = false);
-  void sendResponse(const String& command, bool success,
-                    const String& message = "");
+  void sendMessage(const std::string& message, bool is_error = false);
+  void sendResponse(const std::string& command, bool success,
+                    const std::string& message = "");
 
   // Управление режимами
   void setMode(Mode mode);
   Mode getMode() const { return mode_; }
 
   // Регистрация команд
-  void registerCommand(const String& name, const String& description,
-                       std::function<bool(const String&)> handler,
+  void registerCommand(const std::string& name, const std::string& description,
+                       std::function<bool(const std::string&)> handler,
                        UICommand::Type type = UICommand::Type::SYSTEM);
 
   // Управление подписками
@@ -108,8 +111,8 @@ private:
 
   // Обработка команд
   CommandParser command_parser_;
-  std::map<String, UICommand> commands_;
-  CircularBuffer<String, 16> command_history_;
+  std::map<std::string, UICommand> commands_;
+  CircularBuffer<std::string, 16> command_history_;
 
   // Статистика
   uint32_t commands_processed_;
@@ -119,36 +122,36 @@ private:
   StateSubscriptionCallback state_subscription_;
 
   // Буферы ввода/вывода
-  String input_buffer_;
+  std::string input_buffer_;
   bool new_input_available_;
 
   // Приватные методы
   void setupDefaultCommands();
-  bool executeCommand(const String& command, const String& args);
+  bool executeCommand(const std::string& command, const std::string& args);
   void processSerialInput();
 
   // Обработчики команд по умолчанию
-  bool handleHelp(const String& args);
-  bool handleMove(const String& args);
-  bool handleHome(const String& args);
-  bool handleStop(const String& args);
-  bool handleStatus(const String& args);
-  bool handleConfig(const String& args);
-  bool handleTeach(const String& args);
-  bool handleRun(const String& args);
-  bool handleEmergencyStop(const String& args);
-  bool handleReset(const String& args);
-  bool handleList(const String& args);
-  bool handleMode(const String& args);
+  bool handleHelp(const std::string& args);
+  bool handleMove(const std::string& args);
+  bool handleHome(const std::string& args);
+  bool handleStop(const std::string& args);
+  bool handleStatus(const std::string& args);
+  bool handleConfig(const std::string& args);
+  bool handleTeach(const std::string& args);
+  bool handleRun(const std::string& args);
+  bool handleEmergencyStop(const std::string& args);
+  bool handleReset(const std::string& args);
+  bool handleList(const std::string& args);
+  bool handleMode(const std::string& args);
 
   // Вспомогательные методы
   void printWelcomeMessage() const;
   void printPrompt() const;
-  Vector3 parsePoint(const String& args) const;
-  std::array<float, 3> parseJoints(const String& args) const;
+  Vector3 parsePoint(const std::string& args);
+  std::array<float, 3> parseJoints(const std::string& args);
 
   // Callback'и от Core
   void onStateUpdate(const RobotState& state);
   void onCommandComplete(const Core::CommandResult& result);
-  void onError(uint16_t error_code, const String& error_message);
+  void onError(uint16_t error_code, const std::string& error_message);
 };

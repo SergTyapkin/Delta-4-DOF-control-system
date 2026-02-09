@@ -2,14 +2,16 @@
 
 #include <cmath>
 #include <cstdint>
+
+#undef PI
+#undef TWO_PI
+#undef DEG_TO_RAD
+#undef RAD_TO_DEG
+#undef min
+#undef max
 #include <algorithm>
 
 namespace MathUtils {
-  #undef PI
-  #undef TWO_PI
-  #undef DEG_TO_RAD
-  #undef RAD_TO_DEG
-
   // Константы
   constexpr float PI = 3.14159265358979323846f;
   constexpr float TWO_PI = 2.0f * PI;

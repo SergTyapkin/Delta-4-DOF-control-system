@@ -1,6 +1,6 @@
+#include <Arduino.h>
 #include "Core.h"
 #include "../../src/utils/Logger.h"
-#include <Arduino.h>
 
 Core::Core() :
     mode_(Mode::IDLE),
@@ -434,7 +434,7 @@ void Core::processCommandQueue() {
 void Core::executeCurrentCommand() {
   bool success = false;
   uint16_t error_code = 0;
-  String error_message;
+  std::string error_message;
 
   switch (current_command_.type) {
     case Command::Type::MOVE_TO_POINT:
@@ -819,7 +819,7 @@ bool Core::convertToJointAngles(const Vector3& point, std::array<float, 3>& angl
   return true;
 }
 
-bool Core::checkPointSafety(const Vector3& point) const {
+bool Core::checkPointSafety(const Vector3& point) {
   // Проверка рабочего пространства
   if (!Limits::SafetyCheck::isWorkspacePointSafe(point.x, point.y, point.z)) {
     Logger::warning("Point (%.1f, %.1f, %.1f) outside workspace",
@@ -838,15 +838,16 @@ bool Core::checkPointSafety(const Vector3& point) const {
   return true;
 }
 
-bool Core::checkJointSafety(const std::array<float, 3>& angles) const {
-  return Limits::SafetyCheck::areJointAnglesSafe(angles);
+bool Core::checkJointSafety(const std::array<float, 3>& angles) {
+  return Limits::SafetyCheck::areJointAnglesSafe(angles.data());
 }
 
 void Core::logCommand(const Command& cmd, CommandStatus status,
-                      uint16_t error_code, const String& error_msg) {
+                      uint16_t error_code, const std::string& error_msg) {
 
   const char* type_str = "UNKNOWN";
   switch (cmd.type) {
+    case Command::Type::RUN_PROGRAM: type_str = "RUN_PROGRAM"; break;
     case Command::Type::MOVE_TO_POINT: type_str = "MOVE_TO_POINT"; break;
     case Command::Type::MOVE_JOINTS: type_str = "MOVE_JOINTS"; break;
     case Command::Type::EXECUTE_TRAJECTORY: type_str = "EXECUTE_TRAJECTORY"; break;
@@ -890,7 +891,7 @@ void Core::onDriveStateChanged(uint8_t index, Drive::State old_state,
 
       if (error_callback_) {
         error_callback_(robot_state_.error_code,
-                        String("Drive ") + index + " error");
+                        std::string("Drive ") + Utils::toString(index) + " error");
       }
     }
   }

@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <vector>
+#include <string>
 
 class CommandParser {
 public:
@@ -12,12 +13,12 @@ public:
   void setMaxArgs(uint8_t max) { max_args_ = max; }
 
   // Парсинг строки
-  bool parse(const String& input);
+  bool parse(const std::string& input);
 
   // Получение результатов
-  const std::vector<String>& getTokens() const { return tokens_; }
+  const std::vector<std::string>& getTokens() const { return tokens_; }
   size_t getTokenCount() const { return tokens_.size(); }
-  String getToken(uint8_t index) const;
+  std::string getToken(uint8_t index) const;
 
   // Очистка
   void clear();
@@ -25,5 +26,5 @@ public:
 private:
   char delimiter_;
   uint8_t max_args_;
-  std::vector<String> tokens_;
+  std::vector<std::string> tokens_;
 };
