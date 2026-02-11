@@ -1,6 +1,6 @@
 #pragma once
 
-#include <string>
+#include <Arduino.h>
 #include "DeltaSolver.h"
 #include "../../../src/utils/Vector3.h"
 #include "../../../config/limits.h"
@@ -10,12 +10,13 @@ public:
   // Результат вычислений
   struct Result {
     bool valid;
-    std::array<float, 3> joint_angles; // В радианах
+    float joint_angles[3];  // В радианах
     uint16_t error_code;
-    std::string error_message;
+    char error_message[48];
 
     Result() : valid(false), error_code(0) {
-      joint_angles.fill(0);
+      joint_angles[0] = joint_angles[1] = joint_angles[2] = 0;
+      error_message[0] = '\0';
     }
   };
 
@@ -26,9 +27,7 @@ public:
   void init(const DeltaSolver::DeltaConfig& config);
 
   // Прямая кинематика: углы -> позиция
-  // angles - углы трех рычагов в радианах
   bool forward(const float angles[3], Vector3& position);
-  bool forward(const std::array<float, 3>& angles, Vector3& position);
 
   // Обратная кинематика: позиция -> углы
   Result inverse(const Vector3& position);
@@ -43,11 +42,11 @@ public:
   bool isSafe(const Vector3& position) const;
 
   // Проверка безопасности углов
-  bool areAnglesSafe(const std::array<float, 3>& angles) const;
+  bool areAnglesSafe(const float angles[3]) const;
 
   // Преобразование скорости в пространстве задач в скорости шарниров
   bool velocityMapping(const Vector3& position, const Vector3& task_velocity,
-                       std::array<float, 3>& joint_velocities);
+                       float joint_velocities[3]);
 
   // Получение границ рабочего пространства
   void getWorkspaceBounds(float& min_radius, float& max_radius,
@@ -56,7 +55,7 @@ public:
   // Получение матрицы Якобиана
   bool getJacobian(const Vector3& position, float jacobian[3][3]);
 
-  // Получение определителя Якобиана (для проверки сингулярностей)
+  // Получение определителя Якобиана
   float getJacobianDeterminant(const Vector3& position);
 
   // Проверка на сингулярность
@@ -64,10 +63,6 @@ public:
 
   // Получение текущей конфигурации
   const DeltaSolver::DeltaConfig& getConfig() const;
-
-  // Вспомогательные методы
-  Vector3 getJointPositions(float angle, uint8_t joint_index) const;
-  float getJointDistance(const Vector3& position, uint8_t joint_index) const;
 
   // Конвертация единиц измерения
   static float radiansToDegrees(float rad) { return rad * 57.2957795131f; }
@@ -80,9 +75,8 @@ private:
   bool checkWorkspaceBounds(const Vector3& position) const;
 
   // Проверка угловых ограничений
-  bool checkJointLimits(const std::array<float, 3>& angles) const;
+  bool checkJointLimits(const float angles[3]) const;
 
-  // Проверка на коллизии (упрощенная)
-  bool checkCollisions(const Vector3& position,
-                       const std::array<float, 3>& angles) const;
+  // Проверка на коллизии
+  bool checkCollisions(const Vector3& position, const float angles[3]) const;
 };

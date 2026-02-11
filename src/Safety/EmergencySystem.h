@@ -1,12 +1,12 @@
 #pragma once
 
-#include <cstdint>
+#include <Arduino.h>  // вместо <cstdint>
 #include "../../config/pins_config.h"
 
 class EmergencySystem {
 public:
-  // Коды ошибок
-  enum class ErrorCode : uint16_t {
+  // Коды ошибок (упрощаем - используем обычные enum для экономии памяти)
+  enum ErrorCode : uint16_t {
     NONE               = 0x0000,
     ESTOP_BUTTON       = 0x0001,  // Нажата аварийная кнопка
     LIMIT_SWITCH_1     = 0x0002,  // Сработал концевик 1
@@ -29,7 +29,7 @@ public:
   };
 
   // Состояния системы
-  enum class State {
+  enum State {
     NORMAL,           // Нормальная работа
     WARNING,          // Предупреждение
     SOFT_STOP,        // Программная остановка
@@ -41,13 +41,12 @@ public:
   struct LimitSwitchConfig {
     uint8_t pin;
     bool active_low;   // true если концевик замыкает на GND
-    bool normally_open; // true для нормально-разомкнутых
   };
 
   // Инициализация системы
   void init();
 
-  // Основной метод обновления (вызывается в высокоприоритетной задаче)
+  // Основной метод обновления
   void update();
 
   // Ручной вызов аварийной остановки
@@ -57,17 +56,17 @@ public:
   bool reset();
 
   // Проверка состояния
-  bool isEmergencyActive() const { return state_ == State::EMERGENCY_STOP; }
-  bool isNormal() const { return state_ == State::NORMAL; }
+  bool isEmergencyActive() const { return state_ == EMERGENCY_STOP; }
+  bool isNormal() const { return state_ == NORMAL; }
   State getState() const { return state_; }
 
   // Получение текущих ошибок
-  uint16_t getErrorCode() const { return static_cast<uint16_t>(error_code_); }
+  uint16_t getErrorCode() const { return error_code_; }
   bool hasError(ErrorCode error) const {
-    return (static_cast<uint16_t>(error_code_) & static_cast<uint16_t>(error)) != 0;
+    return (error_code_ & error) != 0;
   }
 
-  // Настройка пользовательского обработчика аварии
+  // Настройка обработчика аварии (упрощаем - указатель на функцию)
   typedef void (*EmergencyCallback)(ErrorCode, void*);
   void setEmergencyCallback(EmergencyCallback callback, void* context = nullptr);
 
@@ -77,10 +76,10 @@ public:
 
 private:
   // Состояние системы
-  State state_ = State::NORMAL;
-  ErrorCode error_code_ = ErrorCode::NONE;
+  State state_ = NORMAL;
+  uint16_t error_code_ = NONE;  // простой uint16_t вместо enum class
 
-  // Конфигурация концевиков
+  // Конфигурация концевиков (упрощаем - убираем normally_open если не используется)
   LimitSwitchConfig limit_switches_[3];
 
   // Пользовательский callback

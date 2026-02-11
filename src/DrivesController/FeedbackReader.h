@@ -1,13 +1,11 @@
 #pragma once
 
-#include <cstdint>
-#include <functional>
-#include "../../config/pins_config.h"
+#include <Arduino.h>  // вместо <cstdint> и <functional>
 
 class FeedbackReader {
 public:
-  // Типы обратной связи
-  enum class FeedbackType {
+  // Типы обратной связи (упрощаем enum class)
+  enum FeedbackType {
     NONE,           // Нет обратной связи
     ENCODER,        // Инкрементальный энкодер
     ABSOLUTE,       // Абсолютный энкодер
@@ -16,47 +14,43 @@ public:
     CURRENT_SENSE   // Измерение тока
   };
 
-  // Конфигурация
+  // Конфигурация (упрощаем)
   struct Config {
     FeedbackType type;
     uint8_t pin_a;          // Фаза A энкодера или аналоговый вход
-    uint8_t pin_b;          // Фаза B энкодера
-    uint8_t pin_index;      // Индексный импульс (опционально)
+    uint8_t pin_b;          // Фаза B энкодера (0 если не используется)
     uint32_t pulses_per_rev; // Импульсов на оборот
-    float voltage_min;      // Минимальное напряжение (для аналоговых)
-    float voltage_max;      // Максимальное напряжение (для аналоговых)
     bool invert_direction;  // Инвертировать направление
 
     Config() :
-        type(FeedbackType::NONE),
+        type(NONE),
         pin_a(0),
         pin_b(0),
-        pin_index(0),
         pulses_per_rev(1024),
-        voltage_min(0.0f),
-        voltage_max(3.3f),
         invert_direction(false) {}
   };
 
-  // Данные обратной связи
+  // Данные обратной связи (упрощаем)
   struct FeedbackData {
     int32_t raw_count;      // Сырое значение счетчика
     float position;         // Позиция (радианы)
     float velocity;         // Скорость (рад/с)
-    float current;          // Ток (А) - если измеряется
     uint32_t timestamp;     // Время последнего обновления
     bool valid;             // Данные валидны
-    uint16_t error_flags;   // Флаги ошибок
+    uint8_t error_flags;    // Флаги ошибок (уменьшаем с uint16_t)
 
     FeedbackData() :
         raw_count(0),
         position(0),
         velocity(0),
-        current(0),
         timestamp(0),
         valid(false),
         error_flags(0) {}
   };
+
+  // Указатели на функции вместо std::function
+  typedef void (*DataUpdateCallback)(const FeedbackData&);
+  typedef void (*ErrorCallback)(uint8_t);
 
   // Конструктор
   FeedbackReader();
@@ -64,7 +58,7 @@ public:
   // Инициализация
   bool init(const Config& config, uint8_t reader_id = 0);
 
-  // Обновление состояния (вызывается периодически или по прерыванию)
+  // Обновление состояния
   void update();
 
   // Обновление по прерыванию (для энкодеров)
@@ -74,7 +68,6 @@ public:
   const FeedbackData& getData() const { return data_; }
   float getPosition() const { return data_.position; }
   float getVelocity() const { return data_.velocity; }
-  float getCurrent() const { return data_.current; }
   bool isValid() const { return data_.valid; }
 
   // Калибровка
@@ -82,13 +75,9 @@ public:
   void setZeroPosition(float position);
 
   // Настройка фильтров
-  void setVelocityFilter(float time_constant); // Постоянная времени фильтра (с)
-  void setCurrentLimit(float max_current);     // Лимит тока для защиты
+  void setVelocityFilter(float time_constant);
 
   // Callback'и
-  typedef std::function<void(const FeedbackData&)> DataUpdateCallback;
-  typedef std::function<void(uint16_t)> ErrorCallback;
-
   void setDataUpdateCallback(DataUpdateCallback callback);
   void setErrorCallback(ErrorCallback callback);
 
@@ -111,7 +100,6 @@ private:
 
   // Для аналоговых датчиков
   uint16_t analog_raw_;
-  uint16_t analog_zero_;
 
   // Фильтры
   float velocity_filter_alpha_;
@@ -126,17 +114,10 @@ private:
   void updateAnalog();
   void updateVelocity();
 
-  // Обработка прерываний для энкодера
-  static void encoderISR(void* context);
-
   // Вспомогательные методы
   float rawToPosition(int32_t raw) const;
   int32_t positionToRaw(float position) const;
-  float analogToPosition(uint16_t analog) const;
-  float analogToCurrent(uint16_t analog) const;
 
   // Проверка ошибок
   void checkForErrors();
-  bool checkSignalQuality() const;
-  bool checkCurrentLimit() const;
 };

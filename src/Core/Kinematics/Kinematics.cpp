@@ -1,5 +1,4 @@
-#include <cmath>
-#include <string>
+#include <Arduino.h>
 #include "Kinematics.h"
 #include "../../../src/utils/Logger.h"
 
@@ -16,11 +15,6 @@ bool Kinematics::forward(const float angles[3], Vector3& position) {
   return solver_.forwardKinematics(angles, position);
 }
 
-bool Kinematics::forward(const std::array<float, 3>& angles, Vector3& position) {
-  float angles_array[3] = {angles[0], angles[1], angles[2]};
-  return forward(angles_array, position);
-}
-
 Kinematics::Result Kinematics::inverse(const Vector3& position) {
   Result result;
   DeltaSolver::Solution solution = solver_.inverseKinematics(position);
@@ -32,7 +26,8 @@ Kinematics::Result Kinematics::inverse(const Vector3& position) {
     result.joint_angles[2] = solution.angles[2];
   } else {
     result.error_code = solution.error_code;
-    result.error_message = std::string("IK failed: ") + solution.error_message;
+    snprintf(result.error_message, sizeof(result.error_message),
+             "IK failed: %s", solution.error_message);
   }
 
   return result;
@@ -45,7 +40,8 @@ Kinematics::Result Kinematics::inverseSafe(const Vector3& position) {
   if (!checkWorkspaceBounds(position)) {
     result.valid = false;
     result.error_code = 3001;
-    result.error_message = "Point outside workspace";
+    snprintf(result.error_message, sizeof(result.error_message),
+             "Point outside workspace");
     return result;
   }
 
@@ -61,18 +57,21 @@ Kinematics::Result Kinematics::inverseSafe(const Vector3& position) {
     if (!areAnglesSafe(result.joint_angles)) {
       result.valid = false;
       result.error_code = 3002;
-      result.error_message = "Joint angles not safe";
+      snprintf(result.error_message, sizeof(result.error_message),
+               "Joint angles not safe");
     }
 
     // Проверка на коллизии
     if (!checkCollisions(position, result.joint_angles)) {
       result.valid = false;
       result.error_code = 3003;
-      result.error_message = "Possible collision detected";
+      snprintf(result.error_message, sizeof(result.error_message),
+               "Possible collision detected");
     }
   } else {
     result.error_code = solution.error_code;
-    result.error_message = std::string("IK failed: ") + solution.error_message;
+    snprintf(result.error_message, sizeof(result.error_message),
+             "IK failed: %s", solution.error_message);
   }
 
   return result;
@@ -83,40 +82,27 @@ bool Kinematics::isReachable(const Vector3& position) {
 }
 
 bool Kinematics::isSafe(const Vector3& position) const {
-  // Проверка рабочего пространства
   if (!checkWorkspaceBounds(position)) {
     return false;
   }
 
-  // Проверка через обратную кинематику
   Result result = const_cast<Kinematics*>(this)->inverseSafe(position);
   return result.valid;
 }
 
-bool Kinematics::areAnglesSafe(const std::array<float, 3>& angles) const {
+bool Kinematics::areAnglesSafe(const float angles[3]) const {
   return checkJointLimits(angles);
 }
 
 bool Kinematics::velocityMapping(const Vector3& position,
                                  const Vector3& task_velocity,
-                                 std::array<float, 3>& joint_velocities) {
+                                 float joint_velocities[3]) {
   float jacobian[3][3];
   if (!solver_.computeJacobian(position, jacobian)) {
     return false;
   }
 
-  float task_vel_array[3] = {task_velocity.x, task_velocity.y, task_velocity.z};
-  float joint_vel_array[3];
-
-  if (!solver_.taskToJointVelocity(position, task_velocity, joint_vel_array)) {
-    return false;
-  }
-
-  joint_velocities[0] = joint_vel_array[0];
-  joint_velocities[1] = joint_vel_array[1];
-  joint_velocities[2] = joint_vel_array[2];
-
-  return true;
+  return solver_.taskToJointVelocity(position, task_velocity, joint_velocities);
 }
 
 void Kinematics::getWorkspaceBounds(float& min_radius, float& max_radius,
@@ -134,10 +120,9 @@ float Kinematics::getJacobianDeterminant(const Vector3& position) {
     return 0.0f;
   }
 
-  // Вычисление определителя матрицы 3x3
-  float det = jacobian[0][0] * (jacobian[1][1] * jacobian[2][2] - jacobian[1][2] * jacobian[2][1])
-              - jacobian[0][1] * (jacobian[1][0] * jacobian[2][2] - jacobian[1][2] * jacobian[2][0])
-              + jacobian[0][2] * (jacobian[1][0] * jacobian[2][1] - jacobian[1][1] * jacobian[2][0]);
+  float det = jacobian[0][0] * (jacobian[1][1] * jacobian[2][2] - jacobian[1][2] * jacobian[2][1]) -
+              jacobian[0][1] * (jacobian[1][0] * jacobian[2][2] - jacobian[1][2] * jacobian[2][0]) +
+              jacobian[0][2] * (jacobian[1][0] * jacobian[2][1] - jacobian[1][1] * jacobian[2][0]);
 
   return det;
 }
@@ -151,50 +136,28 @@ const DeltaSolver::DeltaConfig& Kinematics::getConfig() const {
   return solver_.getConfig();
 }
 
-Vector3 Kinematics::getJointPositions(float angle, uint8_t joint_index) const {
-  if (joint_index >= 3) {
-    return Vector3(0, 0, 0);
-  }
-
-  return solver_.getUpperJointPosition(angle, joint_index);
-}
-
-float Kinematics::getJointDistance(const Vector3& position, uint8_t joint_index) const {
-  if (joint_index >= 3) {
-    return 0.0f;
-  }
-
-  auto config = solver_.getConfig();
-  Vector3 effector_joint = solver_.getEffectorJointPosition(position, joint_index);
-  Vector3 upper_joint = getJointPositions(0, joint_index); // Нулевой угол для упрощения
-
-  return upper_joint.distanceTo(effector_joint);
-}
-
 bool Kinematics::checkWorkspaceBounds(const Vector3& position) const {
   return Limits::SafetyCheck::isWorkspacePointSafe(position.x, position.y, position.z);
 }
 
-bool Kinematics::checkJointLimits(const std::array<float, 3>& angles) const {
-  return Limits::SafetyCheck::areJointAnglesSafe(angles.data());
+bool Kinematics::checkJointLimits(const float angles[3]) const {
+  return Limits::SafetyCheck::areJointAnglesSafe(angles);
 }
 
 bool Kinematics::checkCollisions(const Vector3& position,
-                                 const std::array<float, 3>& angles) const {
+                                 const float angles[3]) const {
   // Упрощенная проверка коллизий
-  // В реальном проекте нужно реализовать полную проверку
-
-  // Проверка минимальной высоты
-  if (position.z > -50.0f) { // Минимум 50 мм от основания
+  if (position.z > -50.0f) {
     return false;
   }
 
-  // Проверка расстояний между рычагами
-  for (uint8_t i = 0; i < 3; i++) {
-    float distance = getJointDistance(position, i);
-    auto config = solver_.getConfig();
+  const auto& config = solver_.getConfig();
 
-    // Проверка на полное вытягивание/складывание
+  for (uint8_t i = 0; i < 3; i++) {
+    Vector3 effector_joint = solver_.getEffectorJointPosition(position, i);
+    Vector3 upper_joint = solver_.getUpperJointPosition(angles[i], i);
+
+    float distance = upper_joint.distanceTo(effector_joint);
     float min_distance = fabs(config.arm_length - config.forearm_length);
     float max_distance = config.arm_length + config.forearm_length;
 

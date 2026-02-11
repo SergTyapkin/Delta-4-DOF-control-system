@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include <algorithm>
 #include "Sheduler.h"
 #include "../../src/utils/Logger.h"
 
@@ -29,7 +28,7 @@ void Sheduler::init() {
   Logger::info("Sheduler ready. Max tasks: %d", MAX_TASKS);
 }
 
-bool Sheduler::addTask(std::function<bool(void*)> func, void* context,
+bool Sheduler::addTask(TaskFunc func, void* context,
                         uint32_t period_ms, Priority priority,
                         bool enabled, bool one_shot) {
 
@@ -57,7 +56,7 @@ bool Sheduler::addTask(std::function<bool(void*)> func, void* context,
   tasks_[slot].period_ms = period_ms;
   tasks_[slot].next_run_time = millis() + (period_ms > 0 ? period_ms : 0);
   tasks_[slot].priority = priority;
-  tasks_[slot].status = TaskStatus::READY;
+  tasks_[slot].status = TASK_READY;
   tasks_[slot].enabled = enabled;
   tasks_[slot].one_shot = one_shot;
 
@@ -94,8 +93,8 @@ bool Sheduler::removeTask(uint8_t task_id) {
 
 bool Sheduler::suspendTask(uint8_t task_id) {
   for (auto& task : tasks_) {
-    if (task.id == task_id && task.status != TaskStatus::SUSPENDED) {
-      task.status = TaskStatus::SUSPENDED;
+    if (task.id == task_id && task.status != TASK_SUSPENDED) {
+      task.status = TASK_SUSPENDED;
       Logger::debug("Task ID=%d suspended", task_id);
       return true;
     }
@@ -105,8 +104,8 @@ bool Sheduler::suspendTask(uint8_t task_id) {
 
 bool Sheduler::resumeTask(uint8_t task_id) {
   for (auto& task : tasks_) {
-    if (task.id == task_id && task.status == TaskStatus::SUSPENDED) {
-      task.status = TaskStatus::READY;
+    if (task.id == task_id && task.status == TASK_SUSPENDED) {
+      task.status = TASK_READY;
       task.next_run_time = millis() + task.period_ms;
       Logger::debug("Task ID=%d resumed", task_id);
       return true;
@@ -121,13 +120,13 @@ void Sheduler::run() {
     for (uint8_t i = 0; i < MAX_TASKS; i++) {
       if (tasks_[i].id == 0 || !tasks_[i].enabled) continue;
       if (tasks_[i].priority != PRIORITY_CRITICAL) continue;
-      if (tasks_[i].status != TaskStatus::READY) continue;
+      if (tasks_[i].status != TASK_READY) continue;
 
       uint32_t current_time = millis();
       if (current_time >= tasks_[i].next_run_time) {
         TIME_TASK_START();
 
-        tasks_[i].status = TaskStatus::RUNNING;
+        tasks_[i].status = TASK_RUNNING;
         bool should_continue = tasks_[i].function(tasks_[i].context);
         tasks_[i].execution_count++;
 
@@ -136,9 +135,9 @@ void Sheduler::run() {
 
         if (should_continue && !tasks_[i].one_shot) {
           tasks_[i].next_run_time = current_time + tasks_[i].period_ms;
-          tasks_[i].status = TaskStatus::READY;
+          tasks_[i].status = TASK_READY;
         } else {
-          tasks_[i].status = TaskStatus::COMPLETED;
+          tasks_[i].status = TASK_COMPLETED;
           tasks_[i].enabled = false;
         }
       }
@@ -152,14 +151,14 @@ void Sheduler::run() {
 
   for (uint8_t i = 0; i < MAX_TASKS; i++) {
     if (tasks_[i].id == 0 || !tasks_[i].enabled) continue;
-    if (tasks_[i].status != TaskStatus::READY) continue;
+    if (tasks_[i].status != TASK_READY) continue;
 
     uint32_t current_time = millis();
     if (current_time >= tasks_[i].next_run_time) {
       TIME_TASK_START();
 
       task_executed = true;
-      tasks_[i].status = TaskStatus::RUNNING;
+      tasks_[i].status = TASK_RUNNING;
       bool should_continue = tasks_[i].function(tasks_[i].context);
       tasks_[i].execution_count++;
 
@@ -175,9 +174,9 @@ void Sheduler::run() {
 
       if (should_continue && !tasks_[i].one_shot) {
         tasks_[i].next_run_time = current_time + tasks_[i].period_ms;
-        tasks_[i].status = TaskStatus::READY;
+        tasks_[i].status = TASK_READY;
       } else {
-        tasks_[i].status = TaskStatus::COMPLETED;
+        tasks_[i].status = TASK_COMPLETED;
         tasks_[i].enabled = false;
       }
     }
@@ -290,7 +289,7 @@ void Sheduler::emergencyStop() {
     // Приостанавливаем все некритические задачи
     for (auto& task : tasks_) {
       if (task.id != 0 && task.priority != PRIORITY_CRITICAL) {
-        task.status = TaskStatus::SUSPENDED;
+        task.status = TASK_SUSPENDED;
       }
     }
 
@@ -304,8 +303,8 @@ void Sheduler::resumeFromEmergency() {
 
     // Возобновляем все задачи
     for (auto& task : tasks_) {
-      if (task.id != 0 && task.status == TaskStatus::SUSPENDED) {
-        task.status = TaskStatus::READY;
+      if (task.id != 0 && task.status == TASK_SUSPENDED) {
+        task.status = TASK_READY;
         task.next_run_time = millis() + task.period_ms;
       }
     }

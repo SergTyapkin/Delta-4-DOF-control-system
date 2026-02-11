@@ -1,7 +1,6 @@
 #pragma once
 
-#include <array>
-#include <cmath>
+#include <Arduino.h>
 #include "Drive.h"
 #include "../../src/utils/CircularBuffer.h"
 
@@ -9,7 +8,7 @@ class DrivesController {
 public:
   // Конфигурация контроллера
   struct Config {
-    std::array<Drive::Config, 3> drive_configs;
+    Drive::Config drive_configs[3];  // обычный массив вместо std::array
     float sync_tolerance;          // Допуск синхронизации (рад)
     uint32_t sync_timeout;         // Таймаут синхронизации (мс)
     bool enable_sync_move;         // Включить синхронное движение
@@ -23,14 +22,13 @@ public:
   };
 
   // Режимы работы контроллера
-  enum class Mode {
+  enum Mode {
     INDEPENDENT,    // Каждый привод независим
-    SYNCHRONIZED,   // Синхронизированное движение
-    MASTER_SLAVE    // Ведущий-ведомый
+    SYNCHRONIZED    // Синхронизированное движение
   };
 
   // Состояния контроллера
-  enum class State {
+  enum State {
     IDLE,
     HOMING,
     MOVING,
@@ -41,7 +39,7 @@ public:
 
   // Команды управления
   struct Command {
-    enum class Type {
+    enum Type {
       MOVE_TO_POSITION,      // Движение в позицию
       MOVE_TO_POSITION_SYNC, // Синхронное движение
       SET_VELOCITY,          // Установка скорости
@@ -53,19 +51,15 @@ public:
     };
 
     Type type;
-    std::array<float, 3> positions;  // Позиции для осей (радианы)
-    std::array<float, 3> velocities; // Скорости для осей (рад/с)
-    float acceleration;               // Ускорение (рад/с²)
-    uint32_t timeout;                 // Таймаут (мс)
-    uint8_t drive_mask;               // Маска приводов (бит 0-2)
+    float positions[3];      // Позиции для осей (радианы)
+    float velocities[3];     // Скорости для осей (рад/с)
+    float acceleration;      // Ускорение (рад/с²)
+    uint32_t timeout;        // Таймаут (мс)
 
-    Command() :
-        type(Type::STOP),
-        positions({0, 0, 0}),
-        velocities({0, 0, 0}),
-        acceleration(0),
-        timeout(0),
-        drive_mask(0b111) {} // Все приводы по умолчанию
+    Command() : type(STOP), acceleration(0), timeout(0) {
+      positions[0] = positions[1] = positions[2] = 0;
+      velocities[0] = velocities[1] = velocities[2] = 0;
+    }
   };
 
   // Конструктор
@@ -74,7 +68,7 @@ public:
   // Инициализация
   bool init(const Config& config);
 
-  // Обновление состояния (вызывается периодически)
+  // Обновление состояния
   void update(uint32_t delta_time_ms);
 
   // Управление командами
@@ -83,14 +77,9 @@ public:
   void clearCommandQueue();
 
   // Прямое управление приводами
-  bool moveToPosition(const std::array<float, 3>& positions,
-                      float velocity = 0,
-                      uint8_t drive_mask = 0b111);
-
-  bool moveToPositionSync(const std::array<float, 3>& positions,
-                          float velocity = 0);
-
-  bool setVelocities(const std::array<float, 3>& velocities);
+  bool moveToPosition(const float positions[3], float velocity = 0);
+  bool moveToPositionSync(const float positions[3], float velocity = 0);
+  bool setVelocities(const float velocities[3]);
 
   // Homing
   bool homeAll();
@@ -110,9 +99,9 @@ public:
   // Получение состояния
   State getState() const { return state_; }
   Mode getMode() const { return mode_; }
-  std::array<float, 3> getPositions() const;
-  std::array<float, 3> getVelocities() const;
-  std::array<float, 3> getTargetPositions() const;
+  void getPositions(float positions[3]) const;
+  void getVelocities(float velocities[3]) const;
+  void getTargetPositions(float targets[3]) const;
 
   // Получение состояния отдельных приводов
   Drive::State getDriveState(uint8_t index) const;
@@ -126,16 +115,16 @@ public:
   uint32_t getCommandsFailed() const { return commands_failed_; }
   uint32_t getQueueSize() const { return command_queue_.size(); }
 
-  // Callback'и
-  typedef std::function<void(State, State)> StateChangeCallback;
-  typedef std::function<void(bool)> HomingCompleteCallback;
-  typedef std::function<void(uint32_t)> CommandCompleteCallback;
-  typedef std::function<void(uint8_t, Drive::State, Drive::State)> DriveStateCallback;
+  // Callback'и - указатели на функции
+  typedef void (*StateChangeCallback)(State, State, void*);
+  typedef void (*HomingCompleteCallback)(bool, void*);
+  typedef void (*CommandCompleteCallback)(uint32_t, void*);
+  typedef void (*DriveStateCallback)(uint8_t, Drive::State, Drive::State, void*);
 
-  void setStateChangeCallback(StateChangeCallback callback);
-  void setHomingCompleteCallback(HomingCompleteCallback callback);
-  void setCommandCompleteCallback(CommandCompleteCallback callback);
-  void setDriveStateCallback(DriveStateCallback callback);
+  void setStateChangeCallback(StateChangeCallback callback, void* context);
+  void setHomingCompleteCallback(HomingCompleteCallback callback, void* context);
+  void setCommandCompleteCallback(CommandCompleteCallback callback, void* context);
+  void setDriveStateCallback(DriveStateCallback callback, void* context);
 
   // Диагностика
   void printStatus() const;
@@ -146,7 +135,7 @@ private:
   Config config_;
 
   // Приводы
-  std::array<Drive, 3> drives_;
+  Drive drives_[3];
 
   // Состояние
   State state_;
@@ -154,7 +143,7 @@ private:
   Mode mode_;
 
   // Очередь команд
-  CircularBuffer<Command, 32> command_queue_;
+  CircularBuffer<Command, 16> command_queue_;  // фиксированный размер
   Command current_command_;
   bool command_in_progress_;
   uint32_t command_start_time_;
@@ -162,22 +151,25 @@ private:
   // Синхронизация
   bool sync_in_progress_;
   uint32_t sync_start_time_;
-  std::array<bool, 3> sync_drives_done_;
+  bool sync_drives_done_[3];
 
   // Статистика
   uint32_t commands_executed_;
   uint32_t commands_failed_;
   uint32_t last_update_time_;
 
-  // Callback'и
+  // Callback'и и их context'ы
   StateChangeCallback state_change_callback_;
   HomingCompleteCallback homing_complete_callback_;
   CommandCompleteCallback command_complete_callback_;
   DriveStateCallback drive_state_callback_;
+  void* state_change_callback_context_;
+  void* homing_complete_callback_context_;
+  void* command_complete_callback_context_;
+  void* drive_state_callback_context_;
 
   // Приватные методы
   void processCommandQueue();
-  void executeCurrentCommand();
   void updateSyncMove();
   void checkSyncCompletion();
 
@@ -189,10 +181,7 @@ private:
 
   // Вспомогательные методы
   bool checkDrivesReady() const;
-  bool checkPositionsValid(const std::array<float, 3>& positions) const;
-  bool checkVelocitiesValid(const std::array<float, 3>& velocities) const;
+  bool checkPositionsValid(const float positions[3]) const;
+  bool checkVelocitiesValid(const float velocities[3]) const;
   void updateControllerState();
-
-  // Логирование
-  void logCommand(const Command& cmd, bool success = true) const;
 };

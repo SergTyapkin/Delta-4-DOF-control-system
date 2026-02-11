@@ -1,29 +1,32 @@
 #pragma once
 
-#include <cstdint>
-#include <functional>
+#include <Arduino.h>
+
+// Вместо std::function, используем указатели на функции
+typedef bool (*TaskFunc)(void* context);
+
 
 class Sheduler {
 public:
   // Максимальное количество задач
-  static constexpr uint8_t MAX_TASKS = 16;
+  static constexpr uint8_t MAX_TASKS = 8;
 
   // Приоритеты задач (чем выше число, тем выше приоритет)
   enum Priority {
-    PRIORITY_CRITICAL = 10,   // Аварийные обработчики
-    PRIORITY_HIGH     = 8,    // Управление приводами
-    PRIORITY_MEDIUM   = 5,    // Кинематика, траектории
-    PRIORITY_LOW      = 3,    // Обработка команд
-    PRIORITY_IDLE     = 1     // UI, логирование
+    PRIORITY_CRITICAL = 4,   // Аварийные обработчики
+    PRIORITY_HIGH     = 3,    // Управление приводами
+    PRIORITY_MEDIUM   = 2,    // Кинематика, траектории
+    PRIORITY_LOW      = 1,    // Обработка команд
+    PRIORITY_IDLE     = 0     // UI, Логирование
   };
 
   // Статус задачи
-  enum class TaskStatus {
-    READY,
-    RUNNING,
-    SUSPENDED,
-    COMPLETED,
-    ERROR
+  enum TaskStatus {
+    TASK_READY,
+    TASK_RUNNING,
+    TASK_SUSPENDED,
+    TASK_COMPLETED,
+    TASK_ERROR
   };
 
   // Структура задачи
@@ -32,7 +35,7 @@ public:
     uint8_t id;
 
     // Функция задачи (возвращает true если нужно продолжать выполнение)
-    std::function<bool(void*)> function;
+    TaskFunc function;
 
     // Контекст для функции
     void* context;
@@ -60,7 +63,7 @@ public:
 
     Task() : id(0), function(nullptr), context(nullptr),
              period_ms(0), next_run_time(0), priority(PRIORITY_IDLE),
-             status(TaskStatus::READY), execution_count(0),
+             status(TASK_READY), execution_count(0),
              total_execution_time(0), max_execution_time(0),
              enabled(true), one_shot(false) {}
   };
@@ -72,7 +75,7 @@ public:
   void init();
 
   // Добавление задачи
-  bool addTask(std::function<bool(void*)> func, void* context,
+  bool addTask(TaskFunc func, void* context,
                uint32_t period_ms, Priority priority,
                bool enabled = true, bool one_shot = false);
 

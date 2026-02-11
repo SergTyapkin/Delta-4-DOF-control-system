@@ -1,14 +1,11 @@
 #pragma once
 
-#include <functional>
-#include <map>
-#include <string>
+#include <Arduino.h>
 #include "RobotState.h"
 #include "TrajectoryGenerator.h"
 #include "../../src/Core/Kinematics/DeltaSolver.h"
 #include "../../src/DrivesController/DrivesController.h"
 #include "../../src/utils/CircularBuffer.h"
-#include "../../src/utils/Utils.h"
 #include "../../config/limits.h"
 
 class Core {
@@ -26,63 +23,64 @@ public:
         default_velocity(Limits::VELOCITY.max_linear_velocity * 0.5f),
         default_acceleration(Limits::VELOCITY.max_linear_acceleration * 0.5f),
         max_jerk(Limits::VELOCITY.max_jerk),
-        trajectory_update_rate(100.0f) {} // 100 Гц
+        trajectory_update_rate(100.0f) {}
   };
 
   // Режимы работы
-  enum class Mode {
-    IDLE,               // Ожидание команд
-    DIRECT_JOINT,       // Прямое управление шарнирами
-    CARTESIAN,          // Управление в декартовых координатах
-    TRAJECTORY,         // Выполнение траектории
-    HOMING,             // Калибровка/поиск нуля
-    TEACHING,           // Режим обучения
-    ERROR               // Ошибка
+  enum Mode {
+    MODE_IDLE,
+    MODE_DIRECT_JOINT,
+    MODE_CARTESIAN,
+    MODE_TRAJECTORY,
+    MODE_HOMING,
+    MODE_TEACHING,
+    MODE_ERROR
   };
 
   // Команды высокого уровня
   struct Command {
-    enum class Type {
-      MOVE_TO_POINT,          // Движение к точке (x,y,z)
-      MOVE_JOINTS,            // Движение шарниров
-      EXECUTE_TRAJECTORY,     // Выполнение траектории
-      TEACH_POINT,            // Запомнить точку
-      RUN_PROGRAM,            // Запуск программы
-      STOP,                   // Остановка
-      PAUSE,                  // Пауза
-      RESUME,                 // Продолжить
-      EMERGENCY_STOP,         // Аварийная остановка
-      SET_HOME,               // Установить нулевую позицию
-      CALIBRATE               // Калибровка
+    enum Type {
+      CMD_MOVE_TO_POINT,
+      CMD_MOVE_JOINTS,
+      CMD_EXECUTE_TRAJECTORY,
+      CMD_TEACH_POINT,
+      CMD_RUN_PROGRAM,
+      CMD_STOP,
+      CMD_PAUSE,
+      CMD_RESUME,
+      CMD_EMERGENCY_STOP,
+      CMD_SET_HOME,
+      CMD_CALIBRATE
     };
 
     Type type;
-    Vector3 target_point;           // Целевая точка (мм)
-    std::array<float, 3> joint_angles; // Углы шарниров (рад)
-    TrajectoryType trajectory_type;   // Тип траектории
-    float velocity;                  // Скорость (мм/с или %)
-    float acceleration;              // Ускорение (мм/с²)
-    uint32_t id;                     // ID команды
-    uint32_t timeout;                // Таймаут (мс)
+    Vector3 target_point;
+    float joint_angles[3];
+    TrajectoryGenerator::TrajectoryType trajectory_type;
+    float velocity;
+    float acceleration;
+    uint32_t id;
+    uint32_t timeout;
 
     Command() :
-        type(Type::STOP),
+        type(CMD_STOP),
         target_point(0, 0, 0),
-        joint_angles({0, 0, 0}),
-        trajectory_type(TrajectoryType::LINEAR),
+        trajectory_type(TrajectoryGenerator::TRAJ_LINEAR),
         velocity(0),
         acceleration(0),
         id(0),
-        timeout(10000) {} // 10 секунд по умолчанию
+        timeout(10000) {
+      joint_angles[0] = joint_angles[1] = joint_angles[2] = 0;
+    }
   };
 
   // Состояния выполнения команды
-  enum class CommandStatus {
-    PENDING,        // Ожидает выполнения
-    EXECUTING,      // Выполняется
-    COMPLETED,      // Успешно завершена
-    FAILED,         // Завершена с ошибкой
-    CANCELLED       // Отменена
+  enum CommandStatus {
+    STATUS_PENDING,
+    STATUS_EXECUTING,
+    STATUS_COMPLETED,
+    STATUS_FAILED,
+    STATUS_CANCELLED
   };
 
   // Результат выполнения команды
@@ -90,14 +88,16 @@ public:
     uint32_t command_id;
     CommandStatus status;
     uint16_t error_code;
-    std::string error_message;
-    uint32_t execution_time; // Время выполнения (мс)
+    char error_message[48];
+    uint32_t execution_time;
 
     CommandResult() :
         command_id(0),
-        status(CommandStatus::PENDING),
+        status(STATUS_PENDING),
         error_code(0),
-        execution_time(0) {}
+        execution_time(0) {
+      error_message[0] = '\0';
+    }
   };
 
   // Конструктор
@@ -106,7 +106,7 @@ public:
   // Инициализация
   bool init(const Config& config);
 
-  // Обновление состояния (вызывается периодически)
+  // Обновление состояния
   void update(uint32_t delta_time_ms);
 
   // Управление командами
@@ -116,12 +116,10 @@ public:
 
   // Управление движением
   bool moveToPoint(const Vector3& point, float velocity = 0,
-                   TrajectoryType traj_type = TrajectoryType::LINEAR);
-
-  bool moveJoints(const std::array<float, 3>& angles, float velocity = 0);
-
+                   TrajectoryGenerator::TrajectoryType traj_type = TrajectoryGenerator::TRAJ_LINEAR);
+  bool moveJoints(const float angles[3], float velocity = 0);
   bool setCartesianVelocity(const Vector3& velocity);
-  bool setJointVelocity(const std::array<float, 3>& velocities);
+  bool setJointVelocity(const float velocities[3]);
 
   // Homing и калибровка
   bool performHoming();
@@ -140,33 +138,30 @@ public:
   RobotState getState() const;
   CommandStatus getCommandStatus(uint32_t command_id) const;
   Vector3 getCurrentPosition() const;
-  std::array<float, 3> getCurrentJoints() const;
+  void getCurrentJoints(float angles[3]) const;
   bool isMoving() const;
   bool isHomed() const;
   bool isReady() const;
 
   // Траектории
   bool startTrajectory(const Vector3& start, const Vector3& end,
-                       TrajectoryType type, float velocity);
-
+                       TrajectoryGenerator::TrajectoryType type, float velocity);
   bool addTrajectoryPoint(const Vector3& point);
   bool clearTrajectory();
 
-  // Обучение (teaching)
+  // Обучение
   bool teachPoint(const Vector3& point, uint32_t point_id = 0);
-  bool saveTeachPoints();
-  bool loadTeachPoints();
 
-  // Callback'и для событий
-  typedef std::function<void(const RobotState&)> StateUpdateCallback;
-  typedef std::function<void(const CommandResult&)> CommandCompleteCallback;
-  typedef std::function<void(Mode, Mode)> ModeChangeCallback;
-  typedef std::function<void(uint16_t, const std::string&)> ErrorCallback;
+  // Callback'и с контекстом
+  typedef void (*StateUpdateCallback)(const RobotState&, void*);
+  typedef void (*CommandCompleteCallback)(const CommandResult&, void*);
+  typedef void (*ModeChangeCallback)(Mode, Mode, void*);
+  typedef void (*ErrorCallback)(uint16_t, const char*, void*);
 
-  void setStateUpdateCallback(StateUpdateCallback callback);
-  void setCommandCompleteCallback(CommandCompleteCallback callback);
-  void setModeChangeCallback(ModeChangeCallback callback);
-  void setErrorCallback(ErrorCallback callback);
+  void setStateUpdateCallback(StateUpdateCallback callback, void* context = nullptr);
+  void setCommandCompleteCallback(CommandCompleteCallback callback, void* context = nullptr);
+  void setModeChangeCallback(ModeChangeCallback callback, void* context = nullptr);
+  void setErrorCallback(ErrorCallback callback, void* context = nullptr);
 
   // Диагностика
   void printStatus() const;
@@ -188,32 +183,47 @@ private:
   Mode previous_mode_;
   bool is_initialized_;
   bool is_homed_;
-  bool is_moving_;
-  bool is_paused_;
 
   // Управление командами
-  CircularBuffer<Command, 64> command_queue_;
+  static const uint8_t COMMAND_QUEUE_SIZE = 16;
+  CircularBuffer<Command, COMMAND_QUEUE_SIZE> command_queue_;
   Command current_command_;
   CommandStatus current_command_status_;
   uint32_t current_command_id_;
   uint32_t current_command_start_time_;
 
-  std::array<CommandResult, 16> command_history_;
+  static const uint8_t COMMAND_HISTORY_SIZE = 16;
+  CommandResult command_history_[COMMAND_HISTORY_SIZE];
   uint8_t command_history_index_;
 
   // Траектории
-  std::vector<Vector3> trajectory_points_;
+  static const uint8_t MAX_TRAJECTORY_POINTS = 32;
+  Vector3 trajectory_points_[MAX_TRAJECTORY_POINTS];
+  uint8_t trajectory_points_count_;
   uint32_t current_trajectory_point_;
   bool trajectory_in_progress_;
 
   // Обучение
-  std::map<uint32_t, Vector3> teach_points_;
+  struct TeachPoint {
+    uint32_t id;
+    Vector3 point;
+  };
+  static const uint8_t MAX_TEACH_POINTS = 20;
+  TeachPoint teach_points_[MAX_TEACH_POINTS];
+  uint8_t teach_points_count_;
 
   // Callback'и
   StateUpdateCallback state_update_callback_;
+  void* state_update_context_;
+
   CommandCompleteCallback command_complete_callback_;
+  void* command_complete_context_;
+
   ModeChangeCallback mode_change_callback_;
+  void* mode_change_context_;
+
   ErrorCallback error_callback_;
+  void* error_context_;
 
   // Приватные методы
   void processCommandQueue();
@@ -234,11 +244,11 @@ private:
   bool handleCalibrate(const Command& cmd);
 
   // Вспомогательные методы
-  bool convertToJointAngles(const Vector3& point, std::array<float, 3>& angles);
+  bool convertToJointAngles(const Vector3& point, float angles[3]);
   bool checkPointSafety(const Vector3& point);
-  bool checkJointSafety(const std::array<float, 3>& angles);
+  bool checkJointSafety(const float angles[3]);
   void logCommand(const Command& cmd, CommandStatus status,
-                  uint16_t error_code = 0, const std::string& error_msg = "");
+                  uint16_t error_code = 0, const char* error_msg = "");
 
   // Обработчики событий от компонентов
   void onDriveStateChanged(uint8_t index, Drive::State old_state,

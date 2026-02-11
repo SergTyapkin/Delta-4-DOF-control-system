@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cstdint>
-
 namespace RobotParams {
   // Геометрические параметры дельта-робота (в мм)
   constexpr float BASE_RADIUS = 150.0f;    // Радиус основания

@@ -1,13 +1,16 @@
 #include "UI.h"
-#include "../../src/utils/Utils.h"
+#include "../../src/utils/Logger.h"
+#include "../../src/utils/MathUtils.h"
 
 UI::UI() :
     robot_core_(nullptr),
     mode_(Mode::INTERACTIVE),
     is_initialized_(false),
     last_update_time_(0),
+    command_count_(0),
     commands_processed_(0),
     errors_count_(0),
+    state_subscription_(nullptr),
     new_input_available_(false) {
 }
 
@@ -20,39 +23,14 @@ void UI::init(Core* robot_core, const Config& config) {
   robot_core_ = robot_core;
   config_ = config;
 
-  // Настройка Serial (если еще не настроен)
+  // Настройка Serial
   if (!Serial) {
     Serial.begin(115200);
-    while (!Serial) {
-      delay(10);
-    }
+    delay(100);
   }
-
-  // Настройка парсера команд
-  command_parser_.setDelimiter(' ');
-  command_parser_.setMaxArgs(10);
 
   // Регистрация команд по умолчанию
   setupDefaultCommands();
-
-  // Подписка на события ядра
-  robot_core_->setStateUpdateCallback(
-      [this](const RobotState& state) {
-        onStateUpdate(state);
-      }
-  );
-
-  robot_core_->setCommandCompleteCallback(
-      [this](const Core::CommandResult& result) {
-        onCommandComplete(result);
-      }
-  );
-
-  robot_core_->setErrorCallback(
-      [this](uint16_t error_code, const std::string& error_message) {
-        onError(error_code, error_message);
-      }
-  );
 
   is_initialized_ = true;
   last_update_time_ = millis();
@@ -71,49 +49,36 @@ void UI::update() {
 
   // Периодические обновления
   if (current_time - last_update_time_ >= config_.update_interval) {
-    // Можно добавить периодические задачи здесь
     last_update_time_ = current_time;
-  }
-
-  // Проверка состояния ядра робота
-  static uint32_t last_status_check = 0;
-  if (current_time - last_status_check > 1000) { // Раз в секунду
-    if (robot_core_->isReady()) {
-      // Робот готов
-    } else if (robot_core_->getMode() == Core::Mode::ERROR) {
-      sendMessage("Robot in ERROR state!", true);
-    }
-    last_status_check = current_time;
   }
 }
 
-void UI::processInput(const std::string& input) {
+void UI::processInput(const String& input) {
   if (!is_initialized_ || input.length() == 0) {
     return;
   }
 
   if (config_.echo_commands) {
     Serial.print("> ");
-    Serial.println(input.c_str());
+    Serial.println(input);
   }
 
   // Добавляем в историю
   command_history_.push(input);
 
   // Парсим команду
-  std::string command;
-  std::string args;
+  int space_pos = input.indexOf(' ');
+  String command, args;
 
-  int space_pos = input.find(' ');
   if (space_pos > 0) {
-    command = input.substr(0, space_pos);
-    args = input.substr(space_pos + 1);
+    command = input.substring(0, space_pos);
+    args = input.substring(space_pos + 1);
   } else {
     command = input;
     args = "";
   }
 
-  command = Utils::toUpper(command);
+  command.toUpperCase();
 
   // Выполняем команду
   bool success = executeCommand(command, args);
@@ -125,7 +90,7 @@ void UI::processInput(const std::string& input) {
 
   commands_processed_++;
 
-  // Выводим приглашение для следующей команды
+  // Выводим приглашение
   if (mode_ == Mode::INTERACTIVE) {
     printPrompt();
   }
@@ -134,8 +99,8 @@ void UI::processInput(const std::string& input) {
 void UI::processInput(const char* input, size_t length) {
   if (length == 0) return;
 
-  std::string input_str(input, length);
-  Utils::trim(input_str);
+  String input_str = String(input);
+  input_str.trim();
 
   if (input_str.length() > 0) {
     processInput(input_str);
@@ -153,18 +118,18 @@ void UI::sendState(const RobotState& state) {
   }
 }
 
-void UI::sendMessage(const std::string& message, bool is_error) {
+void UI::sendMessage(const String& message, bool is_error) {
   if (is_error) {
     Serial.print("[ERROR] ");
   } else {
     Serial.print("[INFO] ");
   }
-  Serial.println(message.c_str());
+  Serial.println(message);
 }
 
-void UI::sendResponse(const std::string& command, bool success, const std::string& message) {
+void UI::sendResponse(const String& command, bool success, const String& message) {
   Serial.print("[");
-  Serial.print(command.c_str());
+  Serial.print(command);
   Serial.print("] ");
 
   if (success) {
@@ -175,7 +140,7 @@ void UI::sendResponse(const std::string& command, bool success, const std::strin
 
   if (message.length() > 0) {
     Serial.print(": ");
-    Serial.print(message.c_str());
+    Serial.print(message);
   }
 
   Serial.println();
@@ -184,10 +149,9 @@ void UI::sendResponse(const std::string& command, bool success, const std::strin
 void UI::setMode(Mode mode) {
   if (mode_ == mode) return;
 
-  Mode old_mode = mode_;
   mode_ = mode;
 
-  std::string mode_str;
+  String mode_str;
   switch (mode_) {
     case Mode::INTERACTIVE: mode_str = "INTERACTIVE"; break;
     case Mode::AUTONOMOUS: mode_str = "AUTONOMOUS"; break;
@@ -199,22 +163,26 @@ void UI::setMode(Mode mode) {
   sendMessage("Mode changed to " + mode_str);
 }
 
-void UI::registerCommand(const std::string& name, const std::string& description,
-                         std::function<bool(const std::string&)> handler,
+void UI::registerCommand(const char* name, const char* description,
+                         bool (*handler)(UI* ui, const String& args),
                          UICommand::Type type) {
+  if (command_count_ >= MAX_COMMANDS) {
+    Logger::error("UI: Too many commands");
+    return;
+  }
 
   UICommand cmd;
   cmd.type = type;
-  cmd.name = Utils::toUpper(name);
+  cmd.name = name;
   cmd.description = description;
   cmd.handler = handler;
 
-  commands_[cmd.name] = cmd;
+  commands_[command_count_++] = cmd;
 
-  Logger::debug("Command registered: %s", cmd.name.c_str());
+  Logger::debug("Command registered: %s", name);
 }
 
-void UI::subscribeToState(StateSubscriptionCallback callback) {
+void UI::subscribeToState(StateCallback callback) {
   state_subscription_ = callback;
 }
 
@@ -222,19 +190,7 @@ void UI::unsubscribeFromState() {
   state_subscription_ = nullptr;
 }
 
-bool UI::saveConfig() {
-  // Здесь должна быть реализация сохранения конфигурации
-  sendMessage("Configuration saved");
-  return true;
-}
-
-bool UI::loadConfig() {
-  // Здесь должна быть реализация загрузки конфигурации
-  sendMessage("Configuration loaded");
-  return true;
-}
-
-void UI::printHelp() const {
+void UI::printHelp() {
   Serial.println("=== Delta Robot Control System ===");
   Serial.println("Available commands:");
   Serial.println("  help                    - Show this help");
@@ -257,10 +213,10 @@ void UI::printHelp() const {
   Serial.println("  teach 0 0 -400          - Teach home position");
 }
 
-void UI::printStatus() const {
+void UI::printStatus() {
   Serial.println("=== UI Status ===");
 
-  std::string mode_str;
+  String mode_str;
   switch (mode_) {
     case Mode::INTERACTIVE: mode_str = "INTERACTIVE"; break;
     case Mode::AUTONOMOUS: mode_str = "AUTONOMOUS"; break;
@@ -270,102 +226,52 @@ void UI::printStatus() const {
   }
 
   Serial.print("Mode: ");
-  Serial.println(mode_str.c_str());
+  Serial.println(mode_str);
 
-  Serial.println("Commands processed:");
+  Serial.print("Commands processed: ");
   Serial.println(commands_processed_);
 
-  Serial.println("Errors:");
+  Serial.print("Errors: ");
   Serial.println(errors_count_);
-
-  Serial.println("Command history:");
-  Serial.print(command_history_.size());
-  Serial.print("/");
-  Serial.print(command_history_.capacity());
 }
 
-void UI::listCommands() const {
+void UI::listCommands() {
   Serial.println("=== Registered Commands ===");
 
-  for (const auto& pair : commands_) {
-    const UICommand& cmd = pair.second;
-
-    Serial.print(cmd.name.c_str());
+  for (int i = 0; i < command_count_; i++) {
+    const UICommand& cmd = commands_[i];
+    Serial.print(cmd.name);
     Serial.print(" - ");
-    Serial.println(cmd.description.c_str());
+    Serial.println(cmd.description);
   }
 
   Serial.print("Total commands: ");
-  Serial.println(commands_.size());
+  Serial.println(command_count_);
 }
 
 void UI::setupDefaultCommands() {
   // Регистрация команд по умолчанию
-  registerCommand("HELP", "Show help",
-                  [this](const std::string& args) { return handleHelp(args); },
-                  UICommand::Type::SYSTEM);
-
-  registerCommand("MOVE", "Move to point X Y Z [VELOCITY]",
-                  [this](const std::string& args) { return handleMove(args); },
-                  UICommand::Type::MOTION);
-
-  registerCommand("JOINTS", "Move joints A1 A2 A3 [VELOCITY]",
-                  [this](const std::string& args) { return handleMove(args); },
-                  UICommand::Type::MOTION);
-
-  registerCommand("HOME", "Perform homing",
-                  [this](const std::string& args) { return handleHome(args); },
-                  UICommand::Type::MOTION);
-
-  registerCommand("STOP", "Stop movement",
-                  [this](const std::string& args) { return handleStop(args); },
-                  UICommand::Type::MOTION);
-
-  registerCommand("ESTOP", "Emergency stop",
-                  [this](const std::string& args) { return handleEmergencyStop(args); },
-                  UICommand::Type::EMERGENCY);
-
-  registerCommand("STATUS", "Show robot status",
-                  [this](const std::string& args) { return handleStatus(args); },
-                  UICommand::Type::QUERY);
-
-  registerCommand("CONFIG", "Show configuration",
-                  [this](const std::string& args) { return handleConfig(args); },
-                  UICommand::Type::CONFIG);
-
-  registerCommand("TEACH", "Teach point X Y Z [ID]",
-                  [this](const std::string& args) { return handleTeach(args); },
-                  UICommand::Type::PROGRAM);
-
-  registerCommand("RUN", "Run program [NAME]",
-                  [this](const std::string& args) { return handleRun(args); },
-                  UICommand::Type::PROGRAM);
-
-  registerCommand("RESET", "Reset errors",
-                  [this](const std::string& args) { return handleReset(args); },
-                  UICommand::Type::SYSTEM);
-
-  registerCommand("LIST", "List all commands",
-                  [this](const std::string& args) { return handleList(args); },
-                  UICommand::Type::SYSTEM);
-
-  registerCommand("MODE", "Set UI mode [MODE]",
-                  [this](const std::string& args) { return handleMode(args); },
-                  UICommand::Type::SYSTEM);
+  registerCommand("HELP", "Show help", handleHelpStaticWrapper, UICommand::SYSTEM);
+  registerCommand("MOVE", "Move to point X Y Z [VELOCITY]", handleMoveStaticWrapper, UICommand::MOTION);
+  registerCommand("HOME", "Perform homing", handleHomeStaticWrapper, UICommand::MOTION);
+  registerCommand("STOP", "Stop movement", handleStopStaticWrapper, UICommand::MOTION);
+  registerCommand("ESTOP", "Emergency stop", handleEmergencyStopStaticWrapper, UICommand::EMERGENCY);
+  registerCommand("STATUS", "Show robot status", handleStatusStaticWrapper, UICommand::QUERY);
+  registerCommand("CONFIG", "Show configuration", handleConfigStaticWrapper, UICommand::CONFIG);
+  registerCommand("TEACH", "Teach point X Y Z [ID]", handleTeachStaticWrapper, UICommand::PROGRAM);
+  registerCommand("RUN", "Run program [NAME]", handleRunStaticWrapper, UICommand::PROGRAM);
+  registerCommand("RESET", "Reset errors", handleResetStaticWrapper, UICommand::SYSTEM);
+  registerCommand("LIST", "List all commands", handleListStaticWrapper, UICommand::SYSTEM);
+  registerCommand("MODE", "Set UI mode [MODE]", handleModeStaticWrapper, UICommand::SYSTEM);
 }
 
-bool UI::executeCommand(const std::string& command, const std::string& args) {
-  auto it = commands_.find(command);
-  if (it == commands_.end()) {
-    return false;
+bool UI::executeCommand(const String& command, const String& args) {
+  for (int i = 0; i < command_count_; i++) {
+    if (command == commands_[i].name) {
+      return commands_[i].handler(this, args);
+    }
   }
-
-//  try {
-  return it->second.handler(args);
-//  } catch (...) {
-//    sendResponse(command, false, "Command execution failed");
-//    return false;
-//  }
+  return false;
 }
 
 void UI::processSerialInput() {
@@ -378,8 +284,7 @@ void UI::processSerialInput() {
       }
     } else if (c == 0x08 || c == 0x7F) { // Backspace or Delete
       if (input_buffer_.length() > 0) {
-        input_buffer_.erase(input_buffer_.length() - 1, 1);
-        // Эхо backspace
+        input_buffer_.remove(input_buffer_.length() - 1);
         Serial.print("\b \b");
       }
     } else if (c >= 32 && c <= 126) { // Printable characters
@@ -388,135 +293,131 @@ void UI::processSerialInput() {
         Serial.print(c);
       }
     }
-    // Игнорируем другие символы
   }
 
   if (new_input_available_) {
     processInput(input_buffer_);
-    input_buffer_.clear();
+    input_buffer_ = "";
     new_input_available_ = false;
   }
 }
 
-bool UI::handleHelp(const std::string& args) {
+bool UI::handleHelp(const String& args) {
   printHelp();
   return true;
 }
 
-bool UI::handleMove(const std::string& args) {
+bool UI::handleMove(const String& args) {
   if (!robot_core_->isReady()) {
     sendResponse("MOVE", false, "Robot not ready");
     return false;
   }
 
-  command_parser_.parse(args);
-  auto tokens = command_parser_.getTokens();
+  Vector3 point(0, 0, 0);
+  float velocity = 0;
 
-  if (tokens.size() < 3) {
+  char* token = strtok((char*)args.c_str(), " ");
+  int count = 0;
+
+  while (token != nullptr && count < 4) {
+    float val = atof(token);
+    if (count < 3) {
+      (&point.x)[count] = val;
+    } else {
+      velocity = val;
+    }
+    token = strtok(nullptr, " ");
+    count++;
+  }
+
+  if (count < 3) {
     sendResponse("MOVE", false, "Need X Y Z coordinates");
     return false;
   }
 
-  float x = Utils::toFloat(tokens[0]);
-  float y = Utils::toFloat(tokens[1]);
-  float z = Utils::toFloat(tokens[2]);
-
-  float velocity = 0;
-  if (tokens.size() >= 4) {
-    velocity = Utils::toFloat(tokens[3]);
-  }
-
-  Vector3 point(x, y, z);
   bool success = robot_core_->moveToPoint(point, velocity);
-
-  sendResponse("MOVE", success,
-               success ? "Movement started" : "Failed to start movement");
-
+  sendResponse("MOVE", success, success ? "Movement started" : "Failed to start movement");
   return success;
 }
 
-bool UI::handleHome(const std::string& args) {
+bool UI::handleHome(const String& args) {
   bool success = robot_core_->performHoming();
-
-  sendResponse("HOME", success,
-               success ? "Homing started" : "Failed to start homing");
-
+  sendResponse("HOME", success, success ? "Homing started" : "Failed to start homing");
   return success;
 }
 
-bool UI::handleStop(const std::string& args) {
+bool UI::handleStop(const String& args) {
   robot_core_->stop();
   sendResponse("STOP", true, "Stopped");
   return true;
 }
 
-bool UI::handleStatus(const std::string& args) {
+bool UI::handleStatus(const String& args) {
   RobotState state = robot_core_->getState();
   state.print();
   return true;
 }
 
-bool UI::handleConfig(const std::string& args) {
+bool UI::handleConfig(const String& args) {
   robot_core_->printStatus();
   robot_core_->printKinematicsInfo();
   return true;
 }
 
-bool UI::handleTeach(const std::string& args) {
-  command_parser_.parse(args);
-  auto tokens = command_parser_.getTokens();
+bool UI::handleTeach(const String& args) {
+  Vector3 point(0, 0, 0);
+  uint32_t point_id = 0;
 
-  if (tokens.size() < 3) {
+  char* token = strtok((char*)args.c_str(), " ");
+  int count = 0;
+
+  while (token != nullptr && count < 4) {
+    float val = atof(token);
+    if (count < 3) {
+      (&point.x)[count] = val;
+    } else {
+      point_id = atoi(token);
+    }
+    token = strtok(nullptr, " ");
+    count++;
+  }
+
+  if (count < 3) {
     sendResponse("TEACH", false, "Need X Y Z coordinates");
     return false;
   }
 
-  float x = Utils::toFloat(tokens[0]);
-  float y = Utils::toFloat(tokens[1]);
-  float z = Utils::toFloat(tokens[2]);
-
-  uint32_t point_id = 0;
-  if (tokens.size() >= 4) {
-    point_id = atoi(tokens[3].c_str());
-  }
-
-  Vector3 point(x, y, z);
   bool success = robot_core_->teachPoint(point, point_id);
-
-  sendResponse("TEACH", success,
-               success ? "Point taught" : "Failed to teach point");
-
+  sendResponse("TEACH", success, success ? "Point taught" : "Failed to teach point");
   return success;
 }
 
-bool UI::handleRun(const std::string& args) {
-  // Здесь должна быть реализация запуска программ
+bool UI::handleRun(const String& args) {
   sendResponse("RUN", false, "Not implemented yet");
   return false;
 }
 
-bool UI::handleEmergencyStop(const std::string& args) {
+bool UI::handleEmergencyStop(const String& args) {
   robot_core_->emergencyStop();
   sendResponse("ESTOP", true, "Emergency stop activated");
   return true;
 }
 
-bool UI::handleReset(const std::string& args) {
+bool UI::handleReset(const String& args) {
   bool success = robot_core_->reset();
-  sendResponse("RESET", success,
-               success ? "Reset successful" : "Reset failed");
+  sendResponse("RESET", success, success ? "Reset successful" : "Reset failed");
   return success;
 }
 
-bool UI::handleList(const std::string& args) {
+bool UI::handleList(const String& args) {
   listCommands();
   return true;
 }
 
-bool UI::handleMode(const std::string& args) {
+bool UI::handleMode(const String& args) {
   if (args.length() == 0) {
     // Показать текущий режим
-    std::string mode_str;
+    String mode_str;
     switch (mode_) {
       case Mode::INTERACTIVE: mode_str = "INTERACTIVE"; break;
       case Mode::AUTONOMOUS: mode_str = "AUTONOMOUS"; break;
@@ -526,11 +427,12 @@ bool UI::handleMode(const std::string& args) {
     }
 
     Serial.print("Current mode: ");
-    Serial.println(mode_str.c_str());
+    Serial.println(mode_str);
     return true;
   }
 
-  std::string mode_arg = Utils::toUpper(args);
+  String mode_arg = args;
+  mode_arg.toUpperCase();
 
   if (mode_arg == "INTERACTIVE") {
     setMode(Mode::INTERACTIVE);
@@ -550,37 +452,49 @@ bool UI::handleMode(const std::string& args) {
   return true;
 }
 
-Vector3 UI::parsePoint(const std::string& args) {
-  command_parser_.parse(args);
-  auto tokens = command_parser_.getTokens();
+// Статические обертки для передачи команд в регистрацию команд
+bool UI::handleHelpStaticWrapper(UI* ui, const String& args) {return ui->handleHelp(args);}
+bool UI::handleMoveStaticWrapper(UI* ui, const String& args) {return ui->handleMove(args);}
+bool UI::handleHomeStaticWrapper(UI* ui, const String& args) {return ui->handleHome(args);}
+bool UI::handleStopStaticWrapper(UI* ui, const String& args) {return ui->handleStop(args);}
+bool UI::handleStatusStaticWrapper(UI* ui, const String& args) {return ui->handleStatus(args);}
+bool UI::handleConfigStaticWrapper(UI* ui, const String& args) {return ui->handleConfig(args);}
+bool UI::handleTeachStaticWrapper(UI* ui, const String& args) {return ui->handleTeach(args);}
+bool UI::handleRunStaticWrapper(UI* ui, const String& args) {return ui->handleRun(args);}
+bool UI::handleEmergencyStopStaticWrapper(UI* ui, const String& args) {return ui->handleEmergencyStop(args);}
+bool UI::handleResetStaticWrapper(UI* ui, const String& args) {return ui->handleReset(args);}
+bool UI::handleListStaticWrapper(UI* ui, const String& args) {return ui->handleList(args);}
+bool UI::handleModeStaticWrapper(UI* ui, const String& args) {return ui->handleMode(args);}
 
-  if (tokens.size() < 3) {
-    return Vector3(0, 0, 0);
+Vector3 UI::parsePoint(const String& args) const {
+  Vector3 point(0, 0, 0);
+  char* token = strtok((char*)args.c_str(), " ");
+  int count = 0;
+
+  while (token != nullptr && count < 3) {
+    (&point.x)[count] = atof(token);
+    token = strtok(nullptr, " ");
+    count++;
   }
 
-  return Vector3(
-      Utils::toFloat(tokens[0]),
-      Utils::toFloat(tokens[1]),
-      Utils::toFloat(tokens[2])
-  );
+  return point;
 }
 
-std::array<float, 3> UI::parseJoints(const std::string& args) {
-  command_parser_.parse(args);
-  auto tokens = command_parser_.getTokens();
+Vector3 UI::parseJoints(const String& args) const {
+  float angles[3] = {0, 0, 0};
+  char* token = strtok((char*)args.c_str(), " ");
+  int count = 0;
 
-  std::array<float, 3> joints = {0, 0, 0};
-
-  if (tokens.size() >= 3) {
-    joints[0] = Utils::toFloat(tokens[0]) * (3.1415926535f / 180.0f);
-    joints[1] = Utils::toFloat(tokens[1]) * (3.1415926535f / 180.0f);
-    joints[2] = Utils::toFloat(tokens[2]) * (3.1415926535f / 180.0f);
+  while (token != nullptr && count < 3) {
+    angles[count] = atof(token) * MathUtils::DEG_TO_RAD;
+    token = strtok(nullptr, " ");
+    count++;
   }
 
-  return joints;
+  return Vector3(angles[0], angles[1], angles[2]);
 }
 
-void UI::printWelcomeMessage() const {
+void UI::printWelcomeMessage() {
   Serial.println();
   Serial.println("========================================");
   Serial.println("    DELTA ROBOT CONTROL SYSTEM v1.0");
@@ -588,7 +502,7 @@ void UI::printWelcomeMessage() const {
   Serial.println();
 }
 
-void UI::printPrompt() const {
+void UI::printPrompt() {
   if (mode_ == Mode::INTERACTIVE) {
     Serial.print("> ");
     Serial.flush();
@@ -601,17 +515,16 @@ void UI::onStateUpdate(const RobotState& state) {
 
 void UI::onCommandComplete(const Core::CommandResult& result) {
   switch (result.status) {
-    case Core::CommandStatus::COMPLETED:
-      sendMessage("Command " + Utils::toString(result.command_id) + " completed", false);
+    case Core::STATUS_COMPLETED:
+      sendMessage(String("Command ") + result.command_id + " completed", false);
       break;
 
-    case Core::CommandStatus::FAILED:
-      sendMessage("Command " + Utils::toString(result.command_id) +
-                  " failed: " + result.error_message, true);
+    case Core::STATUS_FAILED:
+      sendMessage(String("Command ") + result.command_id + " failed: " + result.error_message, true);
       break;
 
-    case Core::CommandStatus::CANCELLED:
-      sendMessage("Command " + Utils::toString(result.command_id) + " cancelled", false);
+    case Core::STATUS_CANCELLED:
+      sendMessage(String("Command ") + result.command_id + " cancelled", false);
       break;
 
     default:
@@ -619,6 +532,6 @@ void UI::onCommandComplete(const Core::CommandResult& result) {
   }
 }
 
-void UI::onError(uint16_t error_code, const std::string& error_message) {
-  sendMessage("Error " + Utils::toString(error_code) + ": " + error_message, true);
+void UI::onError(uint16_t error_code, const String& error_message) {
+  sendMessage(String("Error ") + error_code + ": " + error_message, true);
 }

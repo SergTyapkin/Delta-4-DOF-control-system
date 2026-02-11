@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "author": "Delta Robot",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-stm32f103", "id": "stm", "top": 0, "left": 0, "attrs": { "nucleo": "1" } },
+    { "type": "wokwi-pushbutton", "id": "btn1", "top": -50, "left": 100, "attrs": { "pin": "13" } },
+    { "type": "wokwi-led", "id": "led1", "top": 80, "left": -20, "attrs": { "pin": "PB0", "label": "Ready" } },
+    { "type": "wokwi-led", "id": "led2", "top": 80, "left": 20, "attrs": { "pin": "PB1", "label": "Moving" } },
+    { "type": "wokwi-led", "id": "led3", "top": 80, "left": 60, "attrs": { "pin": "PB2", "label": "Error" } },
+    { "type": "wokwi-buzzer", "id": "buz1", "top": 120, "left": 0, "attrs": { "pin": "PB3" } },
+    { "type": "wokwi-membrane-keypad", "id": "keypad1", "top": 150, "left": 150, "attrs": { "pins": "PA0,PA1,PA2" } }
+  ],
+  "connections": [
+    ["stm:PC13", "btn1:1.l", "green"],
+    ["btn1:2.l", "stm:GND.1", "green"],
+    ["stm:PB0", "led1:A", "green"],
+    ["led1:C", "stm:GND.2", "green"],
+    ["stm:PB1", "led2:A", "green"],
+    ["led2:C", "stm:GND.2", "green"],
+    ["stm:PB2", "led3:A", "green"],
+    ["led3:C", "stm:GND.2", "green"],
+    ["stm:PB3", "buz1:1", "green"],
+    ["buz1:2", "stm:GND.3", "green"],
+    ["stm:PA0", "keypad1:ROW1", "green"],
+    ["stm:PA1", "keypad1:ROW2", "green"],
+    ["stm:PA2", "keypad1:ROW3", "green"],
+    ["stm:PA3", "keypad1:COL1", "green"]
+  ],
+  "serialMonitor": {
+    "display": "always",
+    "newline": "lf"
+  }
+}

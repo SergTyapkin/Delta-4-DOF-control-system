@@ -1,36 +1,32 @@
 #pragma once
 
-#include <cstdint>
-#include <functional>
+#include <Arduino.h>
 #include "../../config/pins_config.h"
-#include "../../src/utils/MathUtils.h"
 
 class Drive {
 public:
   // Режимы работы привода
-  enum class Mode {
-    DISABLED,       // Двигатель отключен
-    HOMING,         // Поиск нуля
-    POSITION,       // Позиционное управление
-    VELOCITY,       // Управление скоростью
-    TORQUE,         // Управление моментом (если поддерживается)
-    CALIBRATING     // Калибровка
+  enum Mode {
+    MODE_DISABLED,
+    MODE_HOMING,
+    MODE_POSITION,
+    MODE_VELOCITY
   };
 
   // Состояния привода
-  enum class State {
-    IDLE,
-    MOVING,
-    HOMING_IN_PROGRESS,
-    ERROR,
-    LIMIT_TRIGGERED
+  enum State {
+    STATE_IDLE,
+    STATE_MOVING,
+    STATE_HOMING_IN_PROGRESS,
+    STATE_ERROR,
+    STATE_LIMIT_TRIGGERED
   };
 
   // Направление homing
-  enum class HomingDirection {
-    POSITIVE,   // К положительному пределу
-    NEGATIVE,   // К отрицательному пределу
-    TO_LIMIT    // К концевику
+  enum HomingDirection {
+    HOMING_POSITIVE,
+    HOMING_NEGATIVE,
+    HOMING_TO_LIMIT
   };
 
   // Конфигурация привода
@@ -43,49 +39,46 @@ public:
     uint8_t fault_pin;
 
     // Параметры двигателя
-    float steps_per_revolution;  // Шагов на оборот (например, 200)
-    float microsteps;            // Коэффициент микрошагов (например, 16)
-    float gear_ratio;            // Передаточное отношение редуктора
+    float steps_per_revolution;
+    float microsteps;
+    float gear_ratio;
 
     // Пределы
-    float max_velocity;          // Макс. скорость (рад/с)
-    float max_acceleration;      // Макс. ускорение (рад/с²)
-    float max_jerk;              // Макс. рывок (рад/с³)
+    float max_velocity;
+    float max_acceleration;
 
     // Параметры homing
-    float homing_velocity;       // Скорость homing (рад/с)
-    float homing_acceleration;   // Ускорение homing (рад/с²)
-    HomingDirection homing_direction; // Направление homing
+    float homing_velocity;
+    float homing_acceleration;
+    HomingDirection homing_direction;
 
     // Ток
-    float run_current;           // Рабочий ток (А)
-    float hold_current;          // Ток удержания (А)
+    float run_current;
+    float hold_current;
 
     // Механические параметры
-    float backlash_compensation; // Компенсация люфта (рад)
-    bool invert_direction;       // Инвертировать направление
+    float backlash_compensation;
+    bool invert_direction;
 
     Config() :
         step_pin(0), dir_pin(0), enable_pin(0),
         limit_switch_pin(0), fault_pin(0),
         steps_per_revolution(200.0f), microsteps(16.0f), gear_ratio(1.0f),
-        max_velocity(10.0f), max_acceleration(50.0f), max_jerk(100.0f),
+        max_velocity(10.0f), max_acceleration(50.0f),
         homing_velocity(2.0f), homing_acceleration(10.0f),
-        homing_direction(HomingDirection::NEGATIVE),
+        homing_direction(HOMING_NEGATIVE),
         run_current(1.0f), hold_current(0.5f),
         backlash_compensation(0.0f), invert_direction(false) {}
   };
 
-  // Параметры движения
+  // Параметры движения (упрощаем)
   struct MotionParams {
-    float target_position;    // Целевая позиция (радианы)
-    float target_velocity;    // Целевая скорость (рад/с)
-    float acceleration;       // Ускорение (рад/с²)
-    float jerk;               // Рывок (рад/с³)
+    float target_position;
+    float target_velocity;
+    float acceleration;
 
     MotionParams() :
-        target_position(0), target_velocity(0),
-        acceleration(0), jerk(0) {}
+        target_position(0), target_velocity(0), acceleration(0) {}
   };
 
   // Конструктор
@@ -94,7 +87,7 @@ public:
   // Инициализация
   bool init(const Config& config, uint8_t drive_id = 0);
 
-  // Обновление состояния (вызывается периодически)
+  // Обновление состояния
   void update(uint32_t delta_time_ms);
 
   // Управление режимами
@@ -104,7 +97,6 @@ public:
 
   // Управление движением
   bool moveToPosition(float position_rad, float velocity = 0);
-  bool moveToPositionRelative(float delta_rad, float velocity = 0);
   bool setVelocity(float velocity_rad_s);
 
   // Homing
@@ -117,7 +109,7 @@ public:
   float getPosition() const { return current_position_; }
   float getVelocity() const { return current_velocity_; }
   float getTargetPosition() const { return motion_params_.target_position; }
-  bool isMoving() const { return state_ == State::MOVING; }
+  bool isMoving() const { return state_ == STATE_MOVING; }
   bool isEnabled() const { return enabled_; }
   bool isHomed() const { return is_homed_; }
   bool isLimitTriggered();
@@ -127,14 +119,14 @@ public:
   void setCurrent(float run_current, float hold_current);
   void setBacklashCompensation(float backlash);
 
-  // Callback'и для событий
-  typedef std::function<void(State, State)> StateChangeCallback;
-  typedef std::function<void(bool)> HomingCompleteCallback;
-  typedef std::function<void(float, float)> PositionUpdateCallback;
+  // Callback'и с контекстом
+  typedef void (*StateChangeCallback)(uint8_t, State, State, void*);
+  typedef void (*HomingCompleteCallback)(uint8_t, bool, void*);
+  typedef void (*PositionUpdateCallback)(uint8_t, float, float, void*);
 
-  void setStateChangeCallback(StateChangeCallback callback);
-  void setHomingCompleteCallback(HomingCompleteCallback callback);
-  void setPositionUpdateCallback(PositionUpdateCallback callback);
+  void setStateChangeCallback(StateChangeCallback callback, void* context = nullptr);
+  void setHomingCompleteCallback(HomingCompleteCallback callback, void* context = nullptr);
+  void setPositionUpdateCallback(PositionUpdateCallback callback, void* context = nullptr);
 
   // Аварийная остановка
   void emergencyStop();
@@ -156,15 +148,14 @@ private:
   Mode mode_;
 
   // Позиция и движение
-  float current_position_;      // Текущая позиция (радианы)
-  float current_velocity_;      // Текущая скорость (рад/с)
-  float target_position_;       // Целевая позиция (радианы)
+  float current_position_;
+  float current_velocity_;
+  float target_position_;
   MotionParams motion_params_;
 
   // Homing
   bool is_homing_;
   bool is_homed_;
-  HomingDirection homing_direction_;
   uint32_t homing_start_time_;
 
   // Пределы
@@ -174,10 +165,9 @@ private:
   // Управление шагами
   bool enabled_;
   bool direction_;
-  uint32_t step_interval_;      // Интервал между шагами (микросекунды)
+  uint32_t step_interval_;
   uint32_t last_step_time_;
-  uint32_t steps_to_execute_;
-  uint32_t steps_executed_;
+  int32_t steps_remaining_;
 
   // Трапецеидальный профиль скорости
   struct VelocityProfile {
@@ -192,11 +182,17 @@ private:
   };
 
   VelocityProfile current_profile_;
+  uint32_t profile_start_time_;
 
-  // Callback'и
+  // Callback'и с контекстом
   StateChangeCallback state_change_callback_;
+  void* state_change_context_;
+
   HomingCompleteCallback homing_complete_callback_;
+  void* homing_complete_context_;
+
   PositionUpdateCallback position_update_callback_;
+  void* position_update_context_;
 
   // Приватные методы
   void updateStepGenerator();
@@ -220,19 +216,12 @@ private:
   void handlePositionControl(uint32_t delta_time_ms);
   void handleVelocityControl(uint32_t delta_time_ms);
 
-  // Обработка прерываний
-  void handleLimitSwitch();
-  void handleDriverFault();
-
   // Аппаратно-зависимые методы
   void setStepPin(bool high);
   void setDirectionPin(bool direction);
   void setEnablePin(bool enable);
   bool readLimitSwitch() const;
   bool readFaultPin() const;
-
-  // Симуляция ШИМ для микрошагов (если драйвер поддерживает)
-  void setMicrostepPWM(uint8_t microstep_level);
 
   // Компенсация люфта
   float applyBacklashCompensation(float position);

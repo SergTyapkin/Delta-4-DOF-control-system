@@ -188,11 +188,10 @@ config.gear_ratio = RobotParams::GEAR_RATIO;
 
 config.max_velocity = 5.0f; // рад/с
 config.max_acceleration = 20.0f; // рад/с²
-config.max_jerk = 100.0f; // рад/с³
 
 config.homing_velocity = 1.0f; // рад/с
 config.homing_acceleration = 5.0f; // рад/с²
-config.homing_direction = Drive::HomingDirection::NEGATIVE;
+config.homing_direction = Drive::HOMING_NEGATIVE;
 
 config.run_current = 1.5f; // А
 config.hold_current = 0.8f; // А
@@ -256,7 +255,7 @@ UI::Config createUIConfig() {
   UI::Config config;
 
   config.update_interval = 50; // мс
-  config.command_timeout = 10000; // мс
+  config.command_timeout = 10000; // мс (10 сек)
   config.echo_commands = true;
   config.debug_mode = false;
 
@@ -511,7 +510,7 @@ void setup() {
     delay(10);
   }
 
-  Logger::init(Logger::Level::INFO);
+  Logger::init(Logger::LEVEL_INFO);
 
   Logger::info("");
   Logger::info("========================================");

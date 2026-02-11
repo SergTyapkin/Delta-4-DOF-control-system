@@ -1,13 +1,15 @@
 #pragma once
 
-#include <Arduino.h>
-#include <functional>
-#include <map>
-#include <string>
-#include "CommandParser.h"
+#include <Arduino.h>  // для String, HardwareSerial, etc
+
 #include "../../src/Core/Core.h"
 #include "../../src/utils/CircularBuffer.h"
-#include "../../src/utils/Logger.h"
+
+class UI;
+
+// Замена std::function на указатели для экономии памяти
+typedef bool (*CommandHandler)(UI* ui, const String& args);
+typedef void (*StateCallback)(const RobotState& state);
 
 class UI {
 public:
@@ -34,9 +36,9 @@ public:
     CONFIG          // Режим конфигурации
   };
 
-  // Команды UI
+  // Команды UI - упрощённая версия
   struct UICommand {
-    enum class Type {
+    enum Type {
       SYSTEM,         // Системные команды
       MOTION,         // Команды движения
       CONFIG,         // Команды конфигурации
@@ -46,9 +48,9 @@ public:
     };
 
     Type type;
-    std::string name;
-    std::string description;
-    std::function<bool(const std::string&)> handler;
+    const char* name;
+    const char* description;
+    CommandHandler handler;
   };
 
   // Конструктор
@@ -61,41 +63,36 @@ public:
   void update();
 
   // Обработка входящих данных
-  void processInput(const std::string& input);
+  void processInput(const String& input);
   void processInput(const char* input, size_t length);
 
   // Отправка состояния
   void sendState(const RobotState& state);
-  void sendMessage(const std::string& message, bool is_error = false);
-  void sendResponse(const std::string& command, bool success,
-                    const std::string& message = "");
+  void sendMessage(const String& message, bool is_error = false);
+  void sendResponse(const String& command, bool success,
+                    const String& message = "");
 
   // Управление режимами
   void setMode(Mode mode);
   Mode getMode() const { return mode_; }
 
-  // Регистрация команд
-  void registerCommand(const std::string& name, const std::string& description,
-                       std::function<bool(const std::string&)> handler,
-                       UICommand::Type type = UICommand::Type::SYSTEM);
+  // Регистрация команд - упрощённая версия
+  void registerCommand(const char* name, const char* description,
+                       bool (*handler)(UI* ui, const String& args),
+                       UICommand::Type type);
 
   // Управление подписками
-  typedef std::function<void(const RobotState&)> StateSubscriptionCallback;
-  void subscribeToState(StateSubscriptionCallback callback);
+  void subscribeToState(StateCallback callback);
   void unsubscribeFromState();
 
   // Получение статистики
   uint32_t getCommandsProcessed() const { return commands_processed_; }
   uint32_t getErrorsCount() const { return errors_count_; }
 
-  // Сохранение/загрузка конфигурации
-  bool saveConfig();
-  bool loadConfig();
-
   // Диагностика
-  void printHelp() const;
-  void printStatus() const;
-  void listCommands() const;
+  static void printHelp();
+  void printStatus();
+  void listCommands();
 
 private:
   // Указатель на ядро робота
@@ -109,49 +106,65 @@ private:
   bool is_initialized_;
   uint32_t last_update_time_;
 
-  // Обработка команд
-  CommandParser command_parser_;
-  std::map<std::string, UICommand> commands_;
-  CircularBuffer<std::string, 16> command_history_;
+  // Команды
+  static const int MAX_COMMANDS = 20;
+  UICommand commands_[MAX_COMMANDS];
+  int command_count_;
+
+  CircularBuffer<String, 8> command_history_;  // уменьшенный буфер
 
   // Статистика
   uint32_t commands_processed_;
   uint32_t errors_count_;
 
   // Подписки
-  StateSubscriptionCallback state_subscription_;
+  StateCallback state_subscription_;
 
   // Буферы ввода/вывода
-  std::string input_buffer_;
+  String input_buffer_;
   bool new_input_available_;
 
   // Приватные методы
   void setupDefaultCommands();
-  bool executeCommand(const std::string& command, const std::string& args);
+  bool executeCommand(const String& command, const String& args);
   void processSerialInput();
 
   // Обработчики команд по умолчанию
-  bool handleHelp(const std::string& args);
-  bool handleMove(const std::string& args);
-  bool handleHome(const std::string& args);
-  bool handleStop(const std::string& args);
-  bool handleStatus(const std::string& args);
-  bool handleConfig(const std::string& args);
-  bool handleTeach(const std::string& args);
-  bool handleRun(const std::string& args);
-  bool handleEmergencyStop(const std::string& args);
-  bool handleReset(const std::string& args);
-  bool handleList(const std::string& args);
-  bool handleMode(const std::string& args);
+  bool handleHelp(const String& args);
+  bool handleMove(const String& args);
+  bool handleHome(const String& args);
+  bool handleStop(const String& args);
+  bool handleStatus(const String& args);
+  bool handleConfig(const String& args);
+  bool handleTeach(const String& args);
+  bool handleRun(const String& args);
+  bool handleEmergencyStop(const String& args);
+  bool handleReset(const String& args);
+  bool handleList(const String& args);
+  bool handleMode(const String& args);
+
+  // Статические обертки для передачи команд в регистрацию команд
+  static bool handleHelpStaticWrapper(UI* ui, const String& args);
+  static bool handleMoveStaticWrapper(UI* ui, const String& args);
+  static bool handleHomeStaticWrapper(UI* ui, const String& args);
+  static bool handleStopStaticWrapper(UI* ui, const String& args);
+  static bool handleStatusStaticWrapper(UI* ui, const String& args);
+  static bool handleConfigStaticWrapper(UI* ui, const String& args);
+  static bool handleTeachStaticWrapper(UI* ui, const String& args);
+  static bool handleRunStaticWrapper(UI* ui, const String& args);
+  static bool handleEmergencyStopStaticWrapper(UI* ui, const String& args);
+  static bool handleResetStaticWrapper(UI* ui, const String& args);
+  static bool handleListStaticWrapper(UI* ui, const String& args);
+  static bool handleModeStaticWrapper(UI* ui, const String& args);
 
   // Вспомогательные методы
-  void printWelcomeMessage() const;
-  void printPrompt() const;
-  Vector3 parsePoint(const std::string& args);
-  std::array<float, 3> parseJoints(const std::string& args);
+  static void printWelcomeMessage();
+  void printPrompt();
+  Vector3 parsePoint(const String& args) const;
+  Vector3 parseJoints(const String& args) const;
 
   // Callback'и от Core
   void onStateUpdate(const RobotState& state);
   void onCommandComplete(const Core::CommandResult& result);
-  void onError(uint16_t error_code, const std::string& error_message);
+  void onError(uint16_t error_code, const String& error_message);
 };

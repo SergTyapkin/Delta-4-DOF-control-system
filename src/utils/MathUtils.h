@@ -1,15 +1,12 @@
 #pragma once
 
-#include <cmath>
-#include <cstdint>
-
+#include <Arduino.h>  // для математических функций
 #undef PI
 #undef TWO_PI
 #undef DEG_TO_RAD
 #undef RAD_TO_DEG
 #undef min
 #undef max
-#include <algorithm>
 
 namespace MathUtils {
   // Константы
@@ -22,10 +19,12 @@ namespace MathUtils {
   inline float toRadians(float degrees) { return degrees * DEG_TO_RAD; }
   inline float toDegrees(float radians) { return radians * RAD_TO_DEG; }
 
-  // Ограничение значения в диапазон
+  // Ограничение значения в диапазон - замена std::min/max
   template<typename T>
   inline T clamp(T value, T min_val, T max_val) {
-    return std::max(min_val, std::min(value, max_val));
+    if (value < min_val) return min_val;
+    if (value > max_val) return max_val;
+    return value;
   }
 
   // Линейная интерполяция
@@ -36,7 +35,7 @@ namespace MathUtils {
 
   // Проверка на равенство с допуском
   inline bool nearlyEqual(float a, float b, float epsilon = 0.0001f) {
-    return fabs(a - b) <= epsilon;
+    return abs(a - b) <= epsilon;  // abs вместо fabs
   }
 
   // Сигнум
@@ -47,23 +46,26 @@ namespace MathUtils {
 
   // Ограничение угла в диапазон [-PI, PI]
   inline float wrapAngle(float angle) {
-    angle = fmod(angle + PI, TWO_PI);
-    if (angle < 0) {
-      angle += TWO_PI;
-    }
-    return angle - PI;
+    // Вместо fmod - ручная реализация
+    angle = angle - TWO_PI * floor(angle / TWO_PI);  // аналог fmod
+    if (angle > PI) angle -= TWO_PI;
+    if (angle < -PI) angle += TWO_PI;
+    return angle;
   }
 
   // Минимум/максимум из трёх значений
   template<typename T>
-  inline T min3(T a, T b, T c) { return std::min(a, std::min(b, c)); }
+  inline T min3(T a, T b, T c) {
+    return (a < b) ? (a < c ? a : c) : (b < c ? b : c);
+  }
 
   template<typename T>
-  inline T max3(T a, T b, T c) { return std::max(a, std::max(b, c)); }
+  inline T max3(T a, T b, T c) {
+    return (a > b) ? (a > c ? a : c) : (b > c ? b : c);
+  }
 
   // Аппроксимация sqrt для ускорения (если нужна)
   inline float fastSqrt(float x) {
-    // Быстрая аппроксимация квадратного корня
     union {
       float f;
       int32_t i;

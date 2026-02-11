@@ -1,7 +1,8 @@
 #pragma once
 
-#include <cstdint>
+#include <Arduino.h>
 #include "robot_params.h"
+#include "../src/utils/MathUtils.h"
 
 namespace Limits {
 

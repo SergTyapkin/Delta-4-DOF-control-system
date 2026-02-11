@@ -1,7 +1,7 @@
 #pragma once
 
-#include <cstdint>
-#include <cstring>
+#include <Arduino.h>  // для size_t и стандартных типов
+
 
 template<typename T, size_t N>
 class CircularBuffer {

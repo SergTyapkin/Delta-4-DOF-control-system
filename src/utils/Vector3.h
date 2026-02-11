@@ -1,7 +1,7 @@
 #pragma once
 
-#include <cmath>
-#include <cstdint>
+#include <Arduino.h>  // для математических функций на ARM
+
 
 class Vector3 {
 public:
@@ -54,7 +54,7 @@ public:
 
   // Длина вектора
   float length() const {
-    return sqrtf(x * x + y * y + z * z);
+    return sqrt(x * x + y * y + z * z);
   }
 
   // Нормализация
@@ -73,22 +73,25 @@ public:
 
   // Расстояние между векторами
   float distanceTo(const Vector3& v) const {
-    return (*this - v).length();
+    float dx = x - v.x;
+    float dy = y - v.y;
+    float dz = z - v.z;
+    return sqrt(dx*dx + dy*dy + dz*dz);
   }
 
   // Проверка на равенство с допуском
   bool equals(const Vector3& v, float tolerance = 0.0001f) const {
-    return fabs(x - v.x) < tolerance &&
-           fabs(y - v.y) < tolerance &&
-           fabs(z - v.z) < tolerance;
+    return abs(x - v.x) < tolerance &&
+           abs(y - v.y) < tolerance &&
+           abs(z - v.z) < tolerance;
   }
 
   // Ограничение значений
   Vector3 clamp(float min_val, float max_val) const {
     return Vector3(
-        fminf(fmaxf(x, min_val), max_val),
-        fminf(fmaxf(y, min_val), max_val),
-        fminf(fmaxf(z, min_val), max_val)
+        (x < min_val) ? min_val : (x > max_val ? max_val : x),
+        (y < min_val) ? min_val : (y > max_val ? max_val : y),
+        (z < min_val) ? min_val : (z > max_val ? max_val : z)
     );
   }
 };
