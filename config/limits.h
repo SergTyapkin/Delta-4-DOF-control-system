@@ -23,9 +23,11 @@ namespace Limits {
 
     // Проверка точки на нахождение в рабочей зоне
     bool isPointValid(float x, float y, float z) const {
-      return (x >= min_x && x <= max_x &&
-              y >= min_y && y <= max_y &&
-              z >= min_z && z <= max_z);
+      return (
+        x >= min_x && x <= max_x &&
+        y >= min_y && y <= max_y &&
+        z >= min_z && z <= max_z
+      );
     }
   };
 
@@ -60,8 +62,9 @@ struct JointLimits {
 };
 
 // Пределы для каждого из трех шарниров
-  constexpr JointLimits JOINT_LIMITS[3] = {
+  constexpr JointLimits JOINT_LIMITS[4] = {
   JointLimits{},
+JointLimits{},
 JointLimits{},
 JointLimits{}
 };
@@ -73,8 +76,11 @@ struct VelocityLimits {
   // Максимальная линейная скорость (мм/с)
   float max_linear_velocity = RobotParams::MAX_VELOCITY;
 
+  // Максимальная скорость поворота платформы (рад/с)
+  float max_angular_velocity = 30.0f * MathUtils::DEG_TO_RAD;
+
   // Максимальная угловая скорость рычагов (рад/с)
-  float max_joint_velocity = 1.5f; // ~86 градусов/с
+  float max_joint_velocity = 90.0f * MathUtils::DEG_TO_RAD;
 
   // Максимальное линейное ускорение (мм/с²)
   float max_linear_acceleration = RobotParams::MAX_ACCELERATION;
@@ -161,8 +167,11 @@ struct ToleranceLimits {
   // Допуск по позиции (мм)
   float position_tolerance = 0.1f;
 
-  // Допуск по углу (радианы)
-  float angle_tolerance = 0.0017f; // ~0.1 градуса
+  // Допуск по наклону платформы (рад)
+  float angular_tolerance = 2.0f * MathUtils::DEG_TO_RAD;
+
+  // Допуск по углу (рад)
+  float angle_tolerance = 0.1f * MathUtils::DEG_TO_RAD;
 
   // Допуск для завершения homing (мм)
   float homing_tolerance = 0.05f;
@@ -207,7 +216,7 @@ namespace SafetyCheck {
 
   // Проверка углов шарниров на безопасность
   static bool areJointAnglesSafe(const float angles[3]) {
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < RobotParams::MOTORS_COUNT; i++) {
       if (!JOINT_LIMITS[i].isAngleValid(angles[i])) {
         return false;
       }

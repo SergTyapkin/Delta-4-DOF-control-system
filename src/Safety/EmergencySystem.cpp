@@ -45,6 +45,7 @@ void EmergencySystem::init() {
   limit_switches_[0] = {Pins::DRIVE_1.limit_switch_pin, true};
   limit_switches_[1] = {Pins::DRIVE_2.limit_switch_pin, true};
   limit_switches_[2] = {Pins::DRIVE_3.limit_switch_pin, true};
+  limit_switches_[3] = {Pins::DRIVE_4.limit_switch_pin, true};
 
   for (auto& sw : limit_switches_) {
     pinMode(sw.pin, sw.active_low ? INPUT_PULLUP : INPUT_PULLDOWN);
@@ -54,6 +55,7 @@ void EmergencySystem::init() {
   pinMode(Pins::DRIVE_1.fault_pin, INPUT_PULLUP);
   pinMode(Pins::DRIVE_2.fault_pin, INPUT_PULLUP);
   pinMode(Pins::DRIVE_3.fault_pin, INPUT_PULLUP);
+  pinMode(Pins::DRIVE_4.fault_pin, INPUT_PULLUP);
 
   Logger::info("Emergency System initialized");
 }
@@ -100,7 +102,7 @@ void EmergencySystem::checkEmergencyButton() {
 
 // Проверка концевиков
 void EmergencySystem::checkLimitSwitches() {
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 4; i++) {
     const auto& sw = limit_switches_[i];
     bool triggered = digitalRead(sw.pin) == (sw.active_low ? LOW : HIGH);
 
@@ -110,6 +112,7 @@ void EmergencySystem::checkLimitSwitches() {
         case 0: error = LIMIT_SWITCH_1; break;
         case 1: error = LIMIT_SWITCH_2; break;
         case 2: error = LIMIT_SWITCH_3; break;
+        case 3: error = LIMIT_SWITCH_4; break;
         default: return;
       }
 
@@ -126,6 +129,7 @@ void EmergencySystem::checkDriverFaults() {
   bool fault1 = (digitalRead(Pins::DRIVE_1.fault_pin) == LOW);
   bool fault2 = (digitalRead(Pins::DRIVE_2.fault_pin) == LOW);
   bool fault3 = (digitalRead(Pins::DRIVE_3.fault_pin) == LOW);
+  bool fault4 = (digitalRead(Pins::DRIVE_4.fault_pin) == LOW);
 
   if (fault1 && !hasError(DRIVER_FAULT_1)) {
     Logger::error("Driver 1 fault detected");
@@ -140,6 +144,11 @@ void EmergencySystem::checkDriverFaults() {
   if (fault3 && !hasError(DRIVER_FAULT_3)) {
     Logger::error("Driver 3 fault detected");
     triggerEmergency(DRIVER_FAULT_3);
+  }
+
+  if (fault4 && !hasError(DRIVER_FAULT_4)) {
+    Logger::error("Driver 4 fault detected");
+    triggerEmergency(DRIVER_FAULT_4);
   }
 }
 
@@ -213,7 +222,8 @@ bool EmergencySystem::reset() {
   bool estop_clear = (digitalRead(Pins::Safety::EMERGENCY_STOP_BUTTON) == HIGH);
   bool faults_clear = (digitalRead(Pins::DRIVE_1.fault_pin) == HIGH &&
                        digitalRead(Pins::DRIVE_2.fault_pin) == HIGH &&
-                       digitalRead(Pins::DRIVE_3.fault_pin) == HIGH);
+                       digitalRead(Pins::DRIVE_3.fault_pin) == HIGH &&
+                       digitalRead(Pins::DRIVE_4.fault_pin) == HIGH);
   bool voltage_ok = isVoltageInRange();
 
   if (estop_clear && faults_clear && voltage_ok) {
@@ -274,19 +284,21 @@ void EmergencySystem::updateStatusLEDs() {
 
 // Активация зуммера с паттерном
 void EmergencySystem::activateBuzzer(uint8_t pattern) {
-for (int i = 0; i < pattern; i++) {
-digitalWrite(Pins::Safety::BUZZER, HIGH);
-delay(BUZZER_PATTERN_TIME);
-digitalWrite(Pins::Safety::BUZZER, LOW);
-if (i < pattern - 1) delay(BUZZER_PATTERN_TIME);
-}
+  for (int i = 0; i < pattern; i++) {
+    digitalWrite(Pins::Safety::BUZZER, HIGH);
+    delay(BUZZER_PATTERN_TIME);
+    digitalWrite(Pins::Safety::BUZZER, LOW);
+    if (i < pattern - 1) {
+      delay(BUZZER_PATTERN_TIME);
+    }
+  }
 }
 
 // Чтение аналогового напряжения
 float EmergencySystem::readAnalogVoltage(uint8_t pin) const {
-int raw = analogRead(pin);
-float voltage = (raw * ADC_REFERENCE) / 4095.0f;
-return voltage * VOLTAGE_DIVIDER_RATIO;
+  int raw = analogRead(pin);
+  float voltage = (raw * ADC_REFERENCE) / 4095.0f;
+  return voltage * VOLTAGE_DIVIDER_RATIO;
 }
 
 // Чтение температуры (заглушка)

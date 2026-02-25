@@ -1,6 +1,10 @@
 #pragma once
 
+#include "../src/utils/MathUtils.h"
+
 namespace RobotParams {
+  constexpr uint8_t MOTORS_COUNT = 4;    // Количество моторов
+
   // Геометрические параметры дельта-робота (в мм)
   constexpr float BASE_RADIUS = 150.0f;    // Радиус основания
   constexpr float EFFECTOR_RADIUS = 50.0f; // Радиус эффектора
@@ -8,7 +12,7 @@ namespace RobotParams {
   constexpr float FOREARM_LENGTH = 600.0f; // Длина предплечья
 
   // Углы расположения рычагов на основании (в градусах)
-  constexpr float BASE_ANGLES[3] = {0.0f, 120.0f, 240.0f};
+  constexpr float BASE_ANGLES[RobotParams::MOTORS_COUNT] = {0.0f, 120.0f, 240.0f, 280.0f};
 
   // Пределы движения (в мм)
   constexpr float WORKSPACE_MIN_Z = -700.0f;
@@ -21,12 +25,12 @@ namespace RobotParams {
 
   // Параметры приводов
   constexpr float STEPS_PER_REVOLUTION = 200.0f;  // Шагов на оборот
-  constexpr float MICROSTEPS = 16.0f;             // Микрошаги
+  constexpr float MICROSTEPS = 800.0f;            // Микрошаги
   constexpr float GEAR_RATIO = 5.0f;              // Передаточное отношение
 
   // Расчетные значения
   constexpr float STEPS_PER_RADIAN =
-      (STEPS_PER_REVOLUTION * MICROSTEPS * GEAR_RATIO) / (2.0f * 3.1415926535f);
+      (STEPS_PER_REVOLUTION * MICROSTEPS * GEAR_RATIO) / (2.0f * MathUtils::PI);
 
   // Параметры управления
   constexpr float MAX_VELOCITY = 100.0f;    // мм/с

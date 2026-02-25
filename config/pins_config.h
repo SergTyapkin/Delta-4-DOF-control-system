@@ -12,41 +12,50 @@ namespace Pins {
   struct DrivePins {
     uint8_t step_pin;
     uint8_t dir_pin;
-    uint8_t enable_pin;
+//    uint8_t enable_pin;
     uint8_t limit_switch_pin;  // Концевик для homing
     uint8_t fault_pin;         // Сигнал ошибки драйвера (опционально)
   };
 
 // Привод 1
   constexpr DrivePins DRIVE_1 = {
-      .step_pin          = 0, // PB0,   // Шаг
-      .dir_pin           = 1, // PB1,   // Направление
-      .enable_pin        = 2, // PB2,   // Разрешение
-      .limit_switch_pin  = 0, // PA0,   // Концевик
-      .fault_pin         = 3 // PA3    // Ошибка драйвера
+      .step_pin          = 24, // Шаг
+      .dir_pin           = 15, // Направление
+//      .enable_pin        = 0,  // Разрешение
+      .limit_switch_pin  = 23, // Концевик
+      .fault_pin         = 18  // Ошибка драйвера
   };
 
 // Привод 2
   constexpr DrivePins DRIVE_2 = {
-      .step_pin          = 6, // PB6,
-      .dir_pin           = 7, // PB7,
-      .enable_pin        = 8, // PB8,
-      .limit_switch_pin  = 1, // PA1,
-      .fault_pin         = 4 // PA4
+      .step_pin          = 26, // Шаг
+      .dir_pin           = 17, // Направление
+//      .enable_pin        = 0,  // Разрешение
+      .limit_switch_pin  = 25, // Концевик
+      .fault_pin         = 18  // Ошибка драйвера
   };
 
 // Привод 3
   constexpr DrivePins DRIVE_3 = {
-      .step_pin          = 8, // PA8,
-      .dir_pin           = 9, // PA9,
-      .enable_pin        = 10, // PA10,
-      .limit_switch_pin  = 2, // PA2,
-      .fault_pin         = 5 // PA5
+      .step_pin          = 28, // Шаг
+      .dir_pin           = 19, // Направление
+//      .enable_pin        = 0,  // Разрешение
+      .limit_switch_pin  = 27, // Концевик
+      .fault_pin         = 18  // Ошибка драйвера
+  };
+
+// Привод 4
+  constexpr DrivePins DRIVE_4 = {
+      .step_pin          = 30, // PB0,   // Шаг
+      .dir_pin           = 21, // PB1,   // Направление
+//      .enable_pin        = 0, // PB2,   // Разрешение
+      .limit_switch_pin  = 29, // PA0,   // Концевик
+      .fault_pin         = 18 // PA3    // Ошибка драйвера
   };
 
 // Массив всех приводов для удобства итераций
-  constexpr DrivePins ALL_DRIVES[] = {DRIVE_1, DRIVE_2, DRIVE_3};
-constexpr uint8_t NUM_DRIVES = 3;
+constexpr DrivePins ALL_DRIVES[] = {DRIVE_1, DRIVE_2, DRIVE_3, DRIVE_4};
+constexpr uint8_t NUM_DRIVES = 4;
 
 // ----------------------------------------------------------------------------
 // Система безопасности

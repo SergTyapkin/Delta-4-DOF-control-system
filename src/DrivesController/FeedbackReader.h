@@ -37,7 +37,7 @@ public:
     float velocity;         // Скорость (рад/с)
     uint32_t timestamp;     // Время последнего обновления
     bool valid;             // Данные валидны
-    uint8_t error_flags;    // Флаги ошибок (уменьшаем с uint16_t)
+    uint8_t error_flags;    // Флаги ошибок
 
     FeedbackData() :
         raw_count(0),
@@ -48,7 +48,6 @@ public:
         error_flags(0) {}
   };
 
-  // Указатели на функции вместо std::function
   typedef void (*DataUpdateCallback)(const FeedbackData&);
   typedef void (*ErrorCallback)(uint8_t);
 

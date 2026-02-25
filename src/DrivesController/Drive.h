@@ -34,8 +34,8 @@ public:
     // Пины
     uint8_t step_pin;
     uint8_t dir_pin;
-    uint8_t enable_pin;
     uint8_t limit_switch_pin;
+    //    uint8_t enable_pin;
     uint8_t fault_pin;
 
     // Параметры двигателя
@@ -53,21 +53,22 @@ public:
     HomingDirection homing_direction;
 
     // Ток
-    float run_current;
-    float hold_current;
+    //    float run_current;
+    //    float hold_current;
 
     // Механические параметры
     float backlash_compensation;
     bool invert_direction;
 
     Config() :
-        step_pin(0), dir_pin(0), enable_pin(0),
+        step_pin(0), dir_pin(0),
+        //        enable_pin(0),
         limit_switch_pin(0), fault_pin(0),
         steps_per_revolution(200.0f), microsteps(16.0f), gear_ratio(1.0f),
         max_velocity(10.0f), max_acceleration(50.0f),
         homing_velocity(2.0f), homing_acceleration(10.0f),
         homing_direction(HOMING_NEGATIVE),
-        run_current(1.0f), hold_current(0.5f),
+        //        run_current(1.0f), hold_current(0.5f),
         backlash_compensation(0.0f), invert_direction(false) {}
   };
 
@@ -116,7 +117,7 @@ public:
 
   // Настройка параметров
   void setLimits(float min_position, float max_position);
-  void setCurrent(float run_current, float hold_current);
+//  void setCurrent(float run_current, float hold_current);
   void setBacklashCompensation(float backlash);
 
   // Callback'и с контекстом

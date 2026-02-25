@@ -1,15 +1,16 @@
 {
   "version": 1,
-  "author": "Delta Robot",
+  "author": "Sergey Tyapkin",
   "editor": "wokwi",
+  "name": "Delta 4 DOF control system",
   "parts": [
-    { "type": "wokwi-stm32f103", "id": "stm", "top": 0, "left": 0, "attrs": { "nucleo": "1" } },
-    { "type": "wokwi-pushbutton", "id": "btn1", "top": -50, "left": 100, "attrs": { "pin": "13" } },
-    { "type": "wokwi-led", "id": "led1", "top": 80, "left": -20, "attrs": { "pin": "PB0", "label": "Ready" } },
-    { "type": "wokwi-led", "id": "led2", "top": 80, "left": 20, "attrs": { "pin": "PB1", "label": "Moving" } },
+    { "type": "wokwi-stm32f103rb", "id": "stm", "top": 0, "left": 0, "attrs": { "nucleo": "1" } },
+    { "type": "wokwi-pushbutton", "id": "btn1", "top": 0, "left": 150, "attrs": { "pin": "13" } },
+    { "type": "wokwi-led", "id": "led1", "top": 80, "left": 0, "attrs": { "pin": "PB0", "label": "Ready" } },
+    { "type": "wokwi-led", "id": "led2", "top": 80, "left": 30, "attrs": { "pin": "PB1", "label": "Moving" } },
     { "type": "wokwi-led", "id": "led3", "top": 80, "left": 60, "attrs": { "pin": "PB2", "label": "Error" } },
-    { "type": "wokwi-buzzer", "id": "buz1", "top": 120, "left": 0, "attrs": { "pin": "PB3" } },
-    { "type": "wokwi-membrane-keypad", "id": "keypad1", "top": 150, "left": 150, "attrs": { "pins": "PA0,PA1,PA2" } }
+    { "type": "wokwi-buzzer", "id": "buz1", "top": -20, "left": 0, "attrs": { "pin": "PB3" } },
+    { "type": "wokwi-membrane-keypad", "id": "keypad1", "top": 80, "left": 150, "attrs": { "pins": "PA0,PA1,PA2" } }
   ],
   "connections": [
     ["stm:PC13", "btn1:1.l", "green"],

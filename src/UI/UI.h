@@ -160,8 +160,6 @@ private:
   // Вспомогательные методы
   static void printWelcomeMessage();
   void printPrompt();
-  Vector3 parsePoint(const String& args) const;
-  Vector3 parseJoints(const String& args) const;
 
   // Callback'и от Core
   void onStateUpdate(const RobotState& state);

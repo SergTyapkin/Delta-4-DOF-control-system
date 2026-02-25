@@ -26,13 +26,13 @@ void DeltaSolver::init(const DeltaConfig& config) {
 void DeltaSolver::precomputeConstants() {
   forearm_squared_ = config_.forearm_length * config_.forearm_length;
 
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     cos_base_angles_[i] = cosf(config_.base_angles[i]);
     sin_base_angles_[i] = sinf(config_.base_angles[i]);
   }
 }
 
-bool DeltaSolver::forwardKinematics(const float angles[3], Vector3& position) {
+bool DeltaSolver::forwardKinematics(const float angles[RobotParams::MOTORS_COUNT], Vector3& position) {
   Vector3 guess(0, 0, (Limits::WORKSPACE.min_z + Limits::WORKSPACE.max_z) / 2);
 
   const uint8_t MAX_ITERATIONS = 50;
@@ -46,9 +46,9 @@ bool DeltaSolver::forwardKinematics(const float angles[3], Vector3& position) {
       return false;
     }
 
-    float error[3];
+    float error[RobotParams::MOTORS_COUNT];
     float max_error = 0;
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < RobotParams::MOTORS_COUNT; i++) {
       error[i] = angles[i] - solution.angles[i];
       if (fabs(error[i]) > max_error) {
         max_error = fabs(error[i]);
@@ -60,38 +60,64 @@ bool DeltaSolver::forwardKinematics(const float angles[3], Vector3& position) {
       return true;
     }
 
-    float jacobian[3][3];
+    float jacobian[RobotParams::MOTORS_COUNT][3];
     if (!computeJacobian(guess, jacobian)) {
       Logger::warning("Forward kinematics: failed to compute Jacobian");
       return false;
     }
 
-    float jacobian_inv[3][3];
+    // В 4-DOF системе у вас больше нет квадратной матрицы Якобиана (она 4×3),
+    // поэтому нужна псевдообратная матрица через (J^T * J)^-1 * J^T (метод наименьших квадратов)
+    // J имеет размерность [MOTORS_COUNT x 3], потому вычисляем J^T * J [3x3]
+    float JTJ[3][3] = {{0}};
+    for (uint8_t i = 0; i < 3; i++) {
+      for (uint8_t j = 0; j < 3; j++) {
+        for (uint8_t k = 0; k < RobotParams::MOTORS_COUNT; k++) {
+          JTJ[i][j] += jacobian[k][i] * jacobian[k][j];
+        }
+      }
+    }
 
-    float det = jacobian[0][0] * (jacobian[1][1] * jacobian[2][2] - jacobian[1][2] * jacobian[2][1])
-                - jacobian[0][1] * (jacobian[1][0] * jacobian[2][2] - jacobian[1][2] * jacobian[2][0])
-                + jacobian[0][2] * (jacobian[1][0] * jacobian[2][1] - jacobian[1][1] * jacobian[2][0]);
+    // Вычисляем определитель JTJ (3x3)
+    float det = JTJ[0][0] * (JTJ[1][1] * JTJ[2][2] - JTJ[1][2] * JTJ[2][1])
+                - JTJ[0][1] * (JTJ[1][0] * JTJ[2][2] - JTJ[1][2] * JTJ[2][0])
+                + JTJ[0][2] * (JTJ[1][0] * JTJ[2][1] - JTJ[1][1] * JTJ[2][0]);
 
     if (fabs(det) < 0.0001f) {
       Logger::warning("Forward kinematics: singular Jacobian matrix");
       return false;
     }
 
+        // Вычисляем обратную матрицу (JTJ)^-1 [3x3]
+    float inv_JTJ[3][3];
     float inv_det = 1.0f / det;
-    jacobian_inv[0][0] = (jacobian[1][1] * jacobian[2][2] - jacobian[2][1] * jacobian[1][2]) * inv_det;
-    jacobian_inv[0][1] = (jacobian[0][2] * jacobian[2][1] - jacobian[0][1] * jacobian[2][2]) * inv_det;
-    jacobian_inv[0][2] = (jacobian[0][1] * jacobian[1][2] - jacobian[0][2] * jacobian[1][1]) * inv_det;
-    jacobian_inv[1][0] = (jacobian[1][2] * jacobian[2][0] - jacobian[1][0] * jacobian[2][2]) * inv_det;
-    jacobian_inv[1][1] = (jacobian[0][0] * jacobian[2][2] - jacobian[0][2] * jacobian[2][0]) * inv_det;
-    jacobian_inv[1][2] = (jacobian[0][2] * jacobian[1][0] - jacobian[0][0] * jacobian[1][2]) * inv_det;
-    jacobian_inv[2][0] = (jacobian[1][0] * jacobian[2][1] - jacobian[1][1] * jacobian[2][0]) * inv_det;
-    jacobian_inv[2][1] = (jacobian[0][1] * jacobian[2][0] - jacobian[0][0] * jacobian[2][1]) * inv_det;
-    jacobian_inv[2][2] = (jacobian[0][0] * jacobian[1][1] - jacobian[0][1] * jacobian[1][0]) * inv_det;
 
-    float delta_pos[3] = {0, 0, 0};
-    for (int i = 0; i < 3; i++) {
-      for (int j = 0; j < 3; j++) {
-        delta_pos[i] += jacobian_inv[i][j] * error[j];
+    inv_JTJ[0][0] = (JTJ[1][1] * JTJ[2][2] - JTJ[2][1] * JTJ[1][2]) * inv_det;
+    inv_JTJ[0][1] = (JTJ[0][2] * JTJ[2][1] - JTJ[0][1] * JTJ[2][2]) * inv_det;
+    inv_JTJ[0][2] = (JTJ[0][1] * JTJ[1][2] - JTJ[0][2] * JTJ[1][1]) * inv_det;
+    inv_JTJ[1][0] = (JTJ[1][2] * JTJ[2][0] - JTJ[1][0] * JTJ[2][2]) * inv_det;
+    inv_JTJ[1][1] = (JTJ[0][0] * JTJ[2][2] - JTJ[0][2] * JTJ[2][0]) * inv_det;
+    inv_JTJ[1][2] = (JTJ[0][2] * JTJ[1][0] - JTJ[0][0] * JTJ[1][2]) * inv_det;
+    inv_JTJ[2][0] = (JTJ[1][0] * JTJ[2][1] - JTJ[1][1] * JTJ[2][0]) * inv_det;
+    inv_JTJ[2][1] = (JTJ[0][1] * JTJ[2][0] - JTJ[0][0] * JTJ[2][1]) * inv_det;
+    inv_JTJ[2][2] = (JTJ[0][0] * JTJ[1][1] - JTJ[0][1] * JTJ[1][0]) * inv_det;
+
+    // Вычисляем псевдообратную матрицу J⁺ = (J^T * J)^-1 * J^T [3 x MOTORS_COUNT]
+    float J_pseudo[3][RobotParams::MOTORS_COUNT] = {{0}};
+    for (uint8_t i = 0; i < 3; i++) {
+      for (uint8_t j = 0; j < RobotParams::MOTORS_COUNT; j++) {
+        for (uint8_t k = 0; k < 3; k++) {
+          J_pseudo[i][j] += inv_JTJ[i][k] * jacobian[j][k];
+        }
+      }
+    }
+
+    // delta_pos [MOTORS_COUNT] = J_pseudo^T * error [3]
+    // (транспонируем J_pseudo для умножения)
+    float delta_pos[RobotParams::MOTORS_COUNT] = {0};
+    for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
+      for (uint8_t j = 0; j < 3; j++) {
+        delta_pos[i] += J_pseudo[j][i] * error[j];
       }
     }
 
@@ -114,7 +140,7 @@ DeltaSolver::Solution DeltaSolver::inverseKinematics(const Vector3& position) {
     return solution;
   }
 
-  for (int i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     solution.angles[i] = solveForArm(position, i);
 
     if (!isSolutionPhysical(solution.angles[i], i)) {
@@ -131,7 +157,7 @@ DeltaSolver::Solution DeltaSolver::inverseKinematics(const Vector3& position) {
   return solution;
 }
 
-float DeltaSolver::solveForArm(const Vector3& position, int arm_index) {
+float DeltaSolver::solveForArm(const Vector3& position, uint8_t arm_index) {
   Vector3 effector_joint = getEffectorJointPosition(position, arm_index);
 
   float base_joint_x = config_.base_radius * cos_base_angles_[arm_index];
@@ -147,8 +173,10 @@ float DeltaSolver::solveForArm(const Vector3& position, int arm_index) {
   float N = dz;
   float D = sqrtf(M * M + N * N);
 
-  if (D > config_.arm_length + config_.forearm_length ||
-      D < fabs(config_.arm_length - config_.forearm_length)) {
+  if (
+    D > config_.arm_length + config_.forearm_length ||
+    D < fabs(config_.arm_length - config_.forearm_length)
+  ) {
     return NAN;
   }
 
@@ -178,7 +206,7 @@ DeltaSolver::Solution DeltaSolver::inverseKinematicsSafe(const Vector3& position
     return solution;
   }
 
-  for (int i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     if (!Limits::JOINT_LIMITS[i].isAngleValid(solution.angles[i])) {
       solution.valid = false;
       solution.error_code = 3;
@@ -217,9 +245,11 @@ bool DeltaSolver::isReachable(const Vector3& position) {
   return test_solution.valid;
 }
 
-DeltaSolver::SingularityType DeltaSolver::checkSingularity(const Vector3& position,
-                                                           const float angles[3]) {
-  for (int i = 0; i < 3; i++) {
+DeltaSolver::SingularityType DeltaSolver::checkSingularity(
+    const Vector3& position,
+    const float angles[RobotParams::MOTORS_COUNT]
+) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     Vector3 upper_joint = getUpperJointPosition(angles[i], i);
     Vector3 effector_joint = getEffectorJointPosition(position, i);
 
@@ -237,7 +267,7 @@ DeltaSolver::SingularityType DeltaSolver::checkSingularity(const Vector3& positi
   return SING_NONE;
 }
 
-bool DeltaSolver::computeJacobian(const Vector3& position, float jacobian[3][3]) {
+bool DeltaSolver::computeJacobian(const Vector3& position, float jacobian[RobotParams::MOTORS_COUNT][3]) {
   const float DELTA = 0.01f;
 
   Solution base_solution = inverseKinematics(position);
@@ -251,7 +281,7 @@ bool DeltaSolver::computeJacobian(const Vector3& position, float jacobian[3][3])
       Vector3(0, 0, DELTA)
   };
 
-  for (int i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < 3; i++) {
     Vector3 varied_pos = position + variations[i];
     Solution varied_solution = inverseKinematics(varied_pos);
 
@@ -259,7 +289,7 @@ bool DeltaSolver::computeJacobian(const Vector3& position, float jacobian[3][3])
       return false;
     }
 
-    for (int j = 0; j < 3; j++) {
+    for (uint8_t j = 0; j < RobotParams::MOTORS_COUNT; j++) {
       jacobian[j][i] = (varied_solution.angles[j] - base_solution.angles[j]) / DELTA;
     }
   }
@@ -267,59 +297,66 @@ bool DeltaSolver::computeJacobian(const Vector3& position, float jacobian[3][3])
   return true;
 }
 
-bool DeltaSolver::taskToJointVelocity(const Vector3& position,
-                                      const Vector3& task_velocity,
-                                      float joint_velocity[3]) {
-  float jacobian[3][3];
+bool DeltaSolver::taskToJointVelocity(
+    const Vector3& position,
+    const Vector3& task_velocity,
+    float joint_velocity[RobotParams::MOTORS_COUNT]
+) {
+  float jacobian[RobotParams::MOTORS_COUNT][3];
 
   if (!computeJacobian(position, jacobian)) {
     return false;
   }
 
-  float JJT[3][3] = {{0}};
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      for (int k = 0; k < 3; k++) {
-        JJT[i][j] += jacobian[i][k] * jacobian[j][k];
+  // Вычисляем J^T * J [3x3]
+  float JTJ[3][3] = {{0}};
+  for (uint8_t i = 0; i < 3; i++) {
+    for (uint8_t j = 0; j < 3; j++) {
+      for (uint8_t k = 0; k < RobotParams::MOTORS_COUNT; k++) {
+        JTJ[i][j] += jacobian[k][i] * jacobian[k][j];
       }
     }
   }
 
-  float det = JJT[0][0] * (JJT[1][1] * JJT[2][2] - JJT[1][2] * JJT[2][1])
-              - JJT[0][1] * (JJT[1][0] * JJT[2][2] - JJT[1][2] * JJT[2][0])
-              + JJT[0][2] * (JJT[1][0] * JJT[2][1] - JJT[1][1] * JJT[2][0]);
+  // Вычисляем определитель JTJ
+  float det = JTJ[0][0] * (JTJ[1][1] * JTJ[2][2] - JTJ[1][2] * JTJ[2][1])
+              - JTJ[0][1] * (JTJ[1][0] * JTJ[2][2] - JTJ[1][2] * JTJ[2][0])
+              + JTJ[0][2] * (JTJ[1][0] * JTJ[2][1] - JTJ[1][1] * JTJ[2][0]);
 
   if (fabs(det) < 0.0001f) {
     return false;
   }
 
-  float inv_JJT[3][3];
+  // Вычисляем обратную матрицу (JTJ)^-1
+  float inv_JTJ[3][3];
   float inv_det = 1.0f / det;
 
-  inv_JJT[0][0] = (JJT[1][1] * JJT[2][2] - JJT[2][1] * JJT[1][2]) * inv_det;
-  inv_JJT[0][1] = (JJT[0][2] * JJT[2][1] - JJT[0][1] * JJT[2][2]) * inv_det;
-  inv_JJT[0][2] = (JJT[0][1] * JJT[1][2] - JJT[0][2] * JJT[1][1]) * inv_det;
-  inv_JJT[1][0] = (JJT[1][2] * JJT[2][0] - JJT[1][0] * JJT[2][2]) * inv_det;
-  inv_JJT[1][1] = (JJT[0][0] * JJT[2][2] - JJT[0][2] * JJT[2][0]) * inv_det;
-  inv_JJT[1][2] = (JJT[0][2] * JJT[1][0] - JJT[0][0] * JJT[1][2]) * inv_det;
-  inv_JJT[2][0] = (JJT[1][0] * JJT[2][1] - JJT[1][1] * JJT[2][0]) * inv_det;
-  inv_JJT[2][1] = (JJT[0][1] * JJT[2][0] - JJT[0][0] * JJT[2][1]) * inv_det;
-  inv_JJT[2][2] = (JJT[0][0] * JJT[1][1] - JJT[0][1] * JJT[1][0]) * inv_det;
+  inv_JTJ[0][0] = (JTJ[1][1] * JTJ[2][2] - JTJ[2][1] * JTJ[1][2]) * inv_det;
+  inv_JTJ[0][1] = (JTJ[0][2] * JTJ[2][1] - JTJ[0][1] * JTJ[2][2]) * inv_det;
+  inv_JTJ[0][2] = (JTJ[0][1] * JTJ[1][2] - JTJ[0][2] * JTJ[1][1]) * inv_det;
+  inv_JTJ[1][0] = (JTJ[1][2] * JTJ[2][0] - JTJ[1][0] * JTJ[2][2]) * inv_det;
+  inv_JTJ[1][1] = (JTJ[0][0] * JTJ[2][2] - JTJ[0][2] * JTJ[2][0]) * inv_det;
+  inv_JTJ[1][2] = (JTJ[0][2] * JTJ[1][0] - JTJ[0][0] * JTJ[1][2]) * inv_det;
+  inv_JTJ[2][0] = (JTJ[1][0] * JTJ[2][1] - JTJ[1][1] * JTJ[2][0]) * inv_det;
+  inv_JTJ[2][1] = (JTJ[0][1] * JTJ[2][0] - JTJ[0][0] * JTJ[2][1]) * inv_det;
+  inv_JTJ[2][2] = (JTJ[0][0] * JTJ[1][1] - JTJ[0][1] * JTJ[1][0]) * inv_det;
 
-  float J_pseudo[3][3] = {{0}};
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      for (int k = 0; k < 3; k++) {
-        J_pseudo[i][j] += jacobian[k][i] * inv_JJT[k][j];
+  // Вычисляем псевдообратную матрицу J⁺ = (J^T * J)^-1 * J^T [3 x MOTORS_COUNT]
+  float J_pseudo[3][RobotParams::MOTORS_COUNT] = {{0}};
+  for (uint8_t i = 0; i < 3; i++) {
+    for (uint8_t j = 0; j < RobotParams::MOTORS_COUNT; j++) {
+      for (uint8_t k = 0; k < 3; k++) {
+        J_pseudo[i][j] += inv_JTJ[i][k] * jacobian[j][k];
       }
     }
   }
 
+  // joint_velocity [MOTORS_COUNT] = J_pseudo^T * task_velocity [3]
   float tv[3] = {task_velocity.x, task_velocity.y, task_velocity.z};
-  for (int i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     joint_velocity[i] = 0;
-    for (int j = 0; j < 3; j++) {
-      joint_velocity[i] += J_pseudo[i][j] * tv[j];
+    for (uint8_t j = 0; j < 3; j++) {
+      joint_velocity[i] += J_pseudo[j][i] * tv[j];
     }
   }
 
@@ -334,7 +371,7 @@ void DeltaSolver::getWorkspaceBounds(float& min_radius, float& max_radius,
   max_z = Limits::WORKSPACE.max_z;
 }
 
-Vector3 DeltaSolver::getUpperJointPosition(float angle, int arm_index) const {
+Vector3 DeltaSolver::getUpperJointPosition(float angle, uint8_t arm_index) const {
   Vector3 position;
 
   position.x = config_.base_radius * cos_base_angles_[arm_index]
@@ -347,7 +384,7 @@ Vector3 DeltaSolver::getUpperJointPosition(float angle, int arm_index) const {
 }
 
 Vector3 DeltaSolver::getEffectorJointPosition(const Vector3& effector_pos,
-                                              int arm_index) const {
+                                              uint8_t arm_index) const {
   Vector3 position;
 
   position.x = effector_pos.x + config_.effector_radius * cos_base_angles_[arm_index];
@@ -366,7 +403,7 @@ float DeltaSolver::calculateJointDistance(const Vector3& upper_joint,
   return sqrtf(dx * dx + dy * dy + dz * dz);
 }
 
-bool DeltaSolver::isSolutionPhysical(float angle, int arm_index) {
+bool DeltaSolver::isSolutionPhysical(float angle, uint8_t arm_index) {
   if (isnan(angle)) {
     return false;
   }

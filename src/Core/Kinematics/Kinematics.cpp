@@ -11,7 +11,7 @@ void Kinematics::init(const DeltaSolver::DeltaConfig& config) {
   Logger::info("Kinematics initialized");
 }
 
-bool Kinematics::forward(const float angles[3], Vector3& position) {
+bool Kinematics::forward(const float angles[RobotParams::MOTORS_COUNT], Vector3& position) {
   return solver_.forwardKinematics(angles, position);
 }
 
@@ -24,6 +24,7 @@ Kinematics::Result Kinematics::inverse(const Vector3& position) {
     result.joint_angles[0] = solution.angles[0];
     result.joint_angles[1] = solution.angles[1];
     result.joint_angles[2] = solution.angles[2];
+    result.joint_angles[3] = solution.angles[3];
   } else {
     result.error_code = solution.error_code;
     snprintf(result.error_message, sizeof(result.error_message),
@@ -52,6 +53,7 @@ Kinematics::Result Kinematics::inverseSafe(const Vector3& position) {
     result.joint_angles[0] = solution.angles[0];
     result.joint_angles[1] = solution.angles[1];
     result.joint_angles[2] = solution.angles[2];
+    result.joint_angles[3] = solution.angles[3];
 
     // Дополнительная проверка безопасности
     if (!areAnglesSafe(result.joint_angles)) {
@@ -90,14 +92,16 @@ bool Kinematics::isSafe(const Vector3& position) const {
   return result.valid;
 }
 
-bool Kinematics::areAnglesSafe(const float angles[3]) const {
+bool Kinematics::areAnglesSafe(const float angles[RobotParams::MOTORS_COUNT]) const {
   return checkJointLimits(angles);
 }
 
-bool Kinematics::velocityMapping(const Vector3& position,
-                                 const Vector3& task_velocity,
-                                 float joint_velocities[3]) {
-  float jacobian[3][3];
+bool Kinematics::velocityMapping(
+    const Vector3& position,
+    const Vector3& task_velocity,
+    float joint_velocities[RobotParams::MOTORS_COUNT]
+) {
+  float jacobian[RobotParams::MOTORS_COUNT][3];
   if (!solver_.computeJacobian(position, jacobian)) {
     return false;
   }
@@ -110,12 +114,12 @@ void Kinematics::getWorkspaceBounds(float& min_radius, float& max_radius,
   solver_.getWorkspaceBounds(min_radius, max_radius, min_z, max_z);
 }
 
-bool Kinematics::getJacobian(const Vector3& position, float jacobian[3][3]) {
+bool Kinematics::getJacobian(const Vector3& position, float jacobian[RobotParams::MOTORS_COUNT][3]) {
   return solver_.computeJacobian(position, jacobian);
 }
 
 float Kinematics::getJacobianDeterminant(const Vector3& position) {
-  float jacobian[3][3];
+  float jacobian[RobotParams::MOTORS_COUNT][3];
   if (!getJacobian(position, jacobian)) {
     return 0.0f;
   }
@@ -127,11 +131,6 @@ float Kinematics::getJacobianDeterminant(const Vector3& position) {
   return det;
 }
 
-bool Kinematics::isSingular(const Vector3& position, float threshold) {
-  float det = getJacobianDeterminant(position);
-  return fabs(det) < threshold;
-}
-
 const DeltaSolver::DeltaConfig& Kinematics::getConfig() const {
   return solver_.getConfig();
 }
@@ -140,12 +139,12 @@ bool Kinematics::checkWorkspaceBounds(const Vector3& position) const {
   return Limits::SafetyCheck::isWorkspacePointSafe(position.x, position.y, position.z);
 }
 
-bool Kinematics::checkJointLimits(const float angles[3]) const {
+bool Kinematics::checkJointLimits(const float angles[RobotParams::MOTORS_COUNT]) const {
   return Limits::SafetyCheck::areJointAnglesSafe(angles);
 }
 
 bool Kinematics::checkCollisions(const Vector3& position,
-                                 const float angles[3]) const {
+                                 const float angles[RobotParams::MOTORS_COUNT]) const {
   // Упрощенная проверка коллизий
   if (position.z > -50.0f) {
     return false;
@@ -153,7 +152,7 @@ bool Kinematics::checkCollisions(const Vector3& position,
 
   const auto& config = solver_.getConfig();
 
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     Vector3 effector_joint = solver_.getEffectorJointPosition(position, i);
     Vector3 upper_joint = solver_.getUpperJointPosition(angles[i], i);
 

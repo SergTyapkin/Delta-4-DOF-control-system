@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include "DrivesController.h"
 #include "../../src/utils/Logger.h"
+#include "../../src/utils/MathUtils.h"
+#include "../../config/robot_params.h"
 
 DrivesController::DrivesController() :
     state_(IDLE),
@@ -18,7 +20,7 @@ DrivesController::DrivesController() :
     command_complete_callback_(nullptr),
     drive_state_callback_(nullptr) {
 
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     sync_drives_done_[i] = false;
   }
 }
@@ -30,7 +32,7 @@ bool DrivesController::init(const Config& config) {
 
   // Инициализация каждого привода
   bool all_initialized = true;
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     if (!drives_[i].init(config_.drive_configs[i], i + 1)) {
       Logger::error("Failed to initialize drive %d", i);
       all_initialized = false;
@@ -79,7 +81,7 @@ void DrivesController::update(uint32_t delta_time_ms) {
   previous_state_ = state_;
 
   // Обновляем каждый привод
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     drives_[i].update(delta_time_ms);
   }
 
@@ -183,7 +185,7 @@ void DrivesController::clearCommandQueue() {
   Logger::info("Command queue cleared");
 }
 
-bool DrivesController::moveToPosition(const float positions[3], float velocity) {
+bool DrivesController::moveToPosition(const float positions[RobotParams::MOTORS_COUNT], float velocity) {
   if (!checkDrivesReady()) {
     Logger::warning("Cannot move: drives not ready");
     return false;
@@ -196,7 +198,7 @@ bool DrivesController::moveToPosition(const float positions[3], float velocity) 
 
   bool success = true;
 
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     if (!drives_[i].moveToPosition(positions[i], velocity)) {
       success = false;
       Logger::error("Drive %d failed to move to position", i);
@@ -211,16 +213,17 @@ bool DrivesController::moveToPosition(const float positions[3], float velocity) 
 
   if (success) {
     state_ = MOVING;
-    Logger::info("Moving to positions: [%.2f, %.2f, %.2f] deg",
-                 positions[0] * 57.2958f,
-                 positions[1] * 57.2958f,
-                 positions[2] * 57.2958f);
+    Logger::info("Moving to positions: [%.2f, %.2f, %.2f, %.2f] deg",
+                 positions[0] * MathUtils::RAD_TO_DEG,
+                 positions[1] * MathUtils::RAD_TO_DEG,
+                 positions[2] * MathUtils::RAD_TO_DEG,
+                 positions[3] * MathUtils::RAD_TO_DEG);
   }
 
   return success;
 }
 
-bool DrivesController::moveToPositionSync(const float positions[3], float velocity) {
+bool DrivesController::moveToPositionSync(const float positions[RobotParams::MOTORS_COUNT], float velocity) {
   if (!config_.enable_sync_move) {
     Logger::warning("Sync move is disabled");
     return moveToPosition(positions, velocity);
@@ -236,7 +239,7 @@ bool DrivesController::moveToPositionSync(const float positions[3], float veloci
 
   // Устанавливаем целевые позиции
   bool all_success = true;
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     if (!drives_[i].moveToPosition(positions[i], velocity)) {
       all_success = false;
       Logger::error("Drive %d failed to set target position", i);
@@ -250,7 +253,7 @@ bool DrivesController::moveToPositionSync(const float positions[3], float veloci
   // Инициализируем синхронное движение
   sync_in_progress_ = true;
   sync_start_time_ = millis();
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     sync_drives_done_[i] = false;
   }
   state_ = SYNCING;
@@ -260,7 +263,7 @@ bool DrivesController::moveToPositionSync(const float positions[3], float veloci
   return true;
 }
 
-bool DrivesController::setVelocities(const float velocities[3]) {
+bool DrivesController::setVelocities(const float velocities[RobotParams::MOTORS_COUNT]) {
   if (!checkDrivesReady()) {
     return false;
   }
@@ -271,7 +274,7 @@ bool DrivesController::setVelocities(const float velocities[3]) {
 
   bool success = true;
 
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     if (!drives_[i].setVelocity(velocities[i])) {
       success = false;
       Logger::error("Drive %d failed to set velocity", i);
@@ -280,9 +283,9 @@ bool DrivesController::setVelocities(const float velocities[3]) {
 
   if (success) {
     state_ = MOVING;
-    Logger::info("Velocities set: [%.2f, %.2f, %.2f] rad/s",
-                 velocities[0], velocities[1], velocities[2]);
   }
+  Logger::info("Velocities set: [%.2f, %.2f, %.2f, %.2f] rad/s",
+               velocities[0], velocities[1], velocities[2], velocities[3]);
 
   return success;
 }
@@ -298,7 +301,7 @@ bool DrivesController::homeAll() {
   state_ = HOMING;
   bool all_success = true;
 
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     if (!drives_[i].startHoming()) {
       all_success = false;
       Logger::error("Drive %d failed to start homing", i);
@@ -331,7 +334,7 @@ bool DrivesController::homeSingle(uint8_t drive_index) {
 }
 
 void DrivesController::enableAll() {
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     drives_[i].enable();
   }
 
@@ -339,7 +342,7 @@ void DrivesController::enableAll() {
 }
 
 void DrivesController::disableAll() {
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     drives_[i].disable();
   }
 
@@ -348,7 +351,7 @@ void DrivesController::disableAll() {
 }
 
 void DrivesController::emergencyStop() {
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     drives_[i].emergencyStop();
   }
 
@@ -360,7 +363,7 @@ void DrivesController::emergencyStop() {
 }
 
 void DrivesController::softStop() {
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     // Плавная остановка через установку нулевой скорости
     drives_[i].setVelocity(0);
   }
@@ -374,7 +377,7 @@ void DrivesController::softStop() {
 bool DrivesController::resetErrors() {
   bool all_reset = true;
 
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     if (!drives_[i].resetError()) {
       all_reset = false;
     }
@@ -393,7 +396,7 @@ bool DrivesController::isHomingComplete() const {
 }
 
 bool DrivesController::isAllHomed() const {
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     if (!drives_[i].isHomed()) {
       return false;
     }
@@ -401,20 +404,20 @@ bool DrivesController::isAllHomed() const {
   return true;
 }
 
-void DrivesController::getPositions(float positions[3]) const {
-  for (uint8_t i = 0; i < 3; i++) {
+void DrivesController::getPositions(float positions[RobotParams::MOTORS_COUNT]) const {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     positions[i] = drives_[i].getPosition();
   }
 }
 
-void DrivesController::getVelocities(float velocities[3]) const {
-  for (uint8_t i = 0; i < 3; i++) {
+void DrivesController::getVelocities(float velocities[RobotParams::MOTORS_COUNT]) const {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     velocities[i] = drives_[i].getVelocity();
   }
 }
 
-void DrivesController::getTargetPositions(float targets[3]) const {
-  for (uint8_t i = 0; i < 3; i++) {
+void DrivesController::getTargetPositions(float targets[RobotParams::MOTORS_COUNT]) const {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     targets[i] = drives_[i].getTargetPosition();
   }
 }
@@ -440,7 +443,7 @@ return drives_[index].isMoving();
 }
 
 bool DrivesController::isMoving() const {
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     if (drives_[i].isMoving()) {
       return true;
     }
@@ -493,7 +496,7 @@ void DrivesController::updateSyncMove() {
   }
 
   // Проверяем завершение движения каждого привода
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     if (!sync_drives_done_[i] && !drives_[i].isMoving()) {
       sync_drives_done_[i] = true;
       Logger::debug("Drive %d sync completed", i);
@@ -506,7 +509,7 @@ void DrivesController::updateSyncMove() {
 
 void DrivesController::checkSyncCompletion() {
   bool all_done = true;
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     if (!sync_drives_done_[i]) {
       all_done = false;
       break;
@@ -520,12 +523,12 @@ void DrivesController::checkSyncCompletion() {
     Logger::info("Synchronized move completed successfully");
 
     // Проверяем точность синхронизации
-    float positions[3], targets[3];
+    float positions[RobotParams::MOTORS_COUNT], targets[RobotParams::MOTORS_COUNT];
     getPositions(positions);
     getTargetPositions(targets);
 
     float max_error = 0;
-    for (uint8_t i = 0; i < 3; i++) {
+    for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
       float error = fabs(positions[i] - targets[i]);
       if (error > max_error) {
         max_error = error;
@@ -539,64 +542,63 @@ void DrivesController::checkSyncCompletion() {
   }
 }
 
-void DrivesController::onDriveStateChanged(uint8_t index,
-Drive::State old_state,
-    Drive::State new_state) {
-Logger::debug("Drive %d state changed: %d -> %d",
-index, old_state, new_state);
+void DrivesController::onDriveStateChanged(
+    uint8_t index,
+    Drive::State old_state,
+    Drive::State new_state
+) {
+  Logger::debug("Drive %d state changed: %d -> %d",index, old_state, new_state);
 
-if (drive_state_callback_) {
-drive_state_callback_(index, old_state, new_state, drive_state_callback_context_);
+  if (drive_state_callback_) {
+    drive_state_callback_(index, old_state, new_state, drive_state_callback_context_);
+  }
+
+  // Если привод перешел в состояние ошибки
+  if (new_state == Drive::STATE_ERROR && config_.stop_on_single_error) {
+    Logger::error("Drive %d error -> stopping all drives", index);
+    emergencyStop();
+  }
 }
 
-// Если привод перешел в состояние ошибки
-if (new_state == Drive::STATE_ERROR && config_.stop_on_single_error) {
-Logger::error("Drive %d error -> stopping all drives", index);
-emergencyStop();
-}
-}
-
-void DrivesController::onDrivePositionUpdated(uint8_t index,
-float position,
-float velocity) {
-// Можно использовать для мониторинга в реальном времени
+void DrivesController::onDrivePositionUpdated(uint8_t index, float position, float velocity) {
+  // Можно использовать для мониторинга в реальном времени
 }
 
 void DrivesController::onDriveHomingComplete(uint8_t index, bool success) {
-Logger::info("Drive %d homing %s", index, success ? "successful" : "failed");
+  Logger::info("Drive %d homing %s", index, success ? "successful" : "failed");
 
-// Проверяем завершение homing всех приводов
-bool all_homed = true;
-bool any_failed = false;
+  // Проверяем завершение homing всех приводов
+  bool all_homed = true;
+  bool any_failed = false;
 
-for (uint8_t i = 0; i < 3; i++) {
-if (!drives_[i].isHomed()) {
-all_homed = false;
-}
-if (drives_[i].getState() == Drive::STATE_ERROR) {
-any_failed = true;
-}
-}
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
+    if (!drives_[i].isHomed()) {
+      all_homed = false;
+    }
+    if (drives_[i].getState() == Drive::STATE_ERROR) {
+      any_failed = true;
+    }
+  }
 
-if (all_homed) {
-state_ = IDLE;
-Logger::info("All drives homed successfully");
+  if (all_homed) {
+    state_ = IDLE;
+    Logger::info("All drives homed successfully");
 
-if (homing_complete_callback_) {
-homing_complete_callback_(true, homing_complete_callback_context_);
-}
-} else if (any_failed) {
-state_ = ERROR;
-Logger::error("Homing failed for one or more drives");
+    if (homing_complete_callback_) {
+      homing_complete_callback_(true, homing_complete_callback_context_);
+    }
+  } else if (any_failed) {
+    state_ = ERROR;
+    Logger::error("Homing failed for one or more drives");
 
-if (homing_complete_callback_) {
-homing_complete_callback_(false, homing_complete_callback_context_);
-}
-}
+    if (homing_complete_callback_) {
+     homing_complete_callback_(false, homing_complete_callback_context_);
+    }
+  }
 }
 
 bool DrivesController::checkDrivesReady() const {
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     Drive::State state = drives_[i].getState();
     if (state == Drive::STATE_ERROR || state == Drive::STATE_LIMIT_TRIGGERED) {
       Logger::warning("Drive not ready (state: %d)", state);
@@ -612,8 +614,8 @@ bool DrivesController::checkDrivesReady() const {
   return true;
 }
 
-bool DrivesController::checkPositionsValid(const float positions[3]) const {
-  for (uint8_t i = 0; i < 3; i++) {
+bool DrivesController::checkPositionsValid(const float positions[RobotParams::MOTORS_COUNT]) const {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     // Проверка на NaN и бесконечность
     if (isnan(positions[i]) || isinf(positions[i])) {
       Logger::error("Invalid position for drive %d: %f", i, positions[i]);
@@ -624,8 +626,8 @@ bool DrivesController::checkPositionsValid(const float positions[3]) const {
   return true;
 }
 
-bool DrivesController::checkVelocitiesValid(const float velocities[3]) const {
-  for (uint8_t i = 0; i < 3; i++) {
+bool DrivesController::checkVelocitiesValid(const float velocities[RobotParams::MOTORS_COUNT]) const {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     if (isnan(velocities[i]) || isinf(velocities[i])) {
       Logger::error("Invalid velocity for drive %d: %f", i, velocities[i]);
       return false;
@@ -642,7 +644,7 @@ void DrivesController::updateControllerState() {
   }
 
   // Проверяем, есть ли приводы в состоянии ошибки
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     if (drives_[i].getState() == Drive::STATE_ERROR) {
       state_ = ERROR;
       return;
@@ -651,7 +653,7 @@ void DrivesController::updateControllerState() {
 
   // Проверяем, движется ли хотя бы один привод
   bool any_moving = false;
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     if (drives_[i].isMoving()) {
       any_moving = true;
       break;
@@ -667,7 +669,7 @@ void DrivesController::updateControllerState() {
   } else {
     // Проверяем, выполняется ли homing
     bool any_homing = false;
-    for (uint8_t i = 0; i < 3; i++) {
+    for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
       if (drives_[i].getState() == Drive::STATE_HOMING_IN_PROGRESS) {
         any_homing = true;
         break;
@@ -704,7 +706,7 @@ void DrivesController::setDriveStateCallback(DriveStateCallback callback, void* 
 }
 
 void DrivesController::printStatus() const {
-  float positions[3], velocities[3];
+  float positions[RobotParams::MOTORS_COUNT], velocities[RobotParams::MOTORS_COUNT];
   getPositions(positions);
   getVelocities(velocities);
 
@@ -715,20 +717,21 @@ void DrivesController::printStatus() const {
   Logger::info("Sync in progress: %s", sync_in_progress_ ? "YES" : "NO");
   Logger::info("All homed: %s", isAllHomed() ? "YES" : "NO");
 
-  Logger::info("Positions (deg): [%.2f, %.2f, %.2f]",
-               positions[0] * 57.2958f,
-               positions[1] * 57.2958f,
-               positions[2] * 57.2958f);
+  Logger::info("Positions (deg): [%.2f, %.2f, %.2f, %.2f]",
+               positions[0] * MathUtils::RAD_TO_DEG,
+               positions[1] * MathUtils::RAD_TO_DEG,
+               positions[2] * MathUtils::RAD_TO_DEG,
+               positions[3] * MathUtils::RAD_TO_DEG);
 
-  Logger::info("Velocities (rad/s): [%.3f, %.3f, %.3f]",
-               velocities[0], velocities[1], velocities[2]);
+  Logger::info("Velocities (rad/s): [%.3f, %.3f, %.3f, %.3f]",
+               velocities[0], velocities[1], velocities[2], velocities[3]);
 }
 
 void DrivesController::printDriveInfo(uint8_t index) const {
-if (index >= 3) {
-Logger::error("Invalid drive index: %d", index);
-return;
-}
+  if (index >= 3) {
+    Logger::error("Invalid drive index: %d", index);
+    return;
+  }
 
-drives_[index].printDebugInfo();
+  drives_[index].printDebugInfo();
 }

@@ -1,0 +1,11 @@
+[wokwi]
+version = 1
+firmware = 'Delta4DOF.ino.bin'
+elf = 'Delta4DOF.ino.elf'
+
+[mcu]
+name = "stm32f103rb"
+frequency = 72000000
+
+[serial]
+baud = 115200

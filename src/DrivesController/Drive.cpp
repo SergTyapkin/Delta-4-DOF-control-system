@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "Drive.h"
 #include "../../src/utils/Logger.h"
+#include "../../src/utils/MathUtils.h"
 
 // Макросы для быстрого управления пинами
 #define SET_PIN(pin, value) digitalWrite(pin, value)
@@ -18,8 +19,8 @@ Drive::Drive() :
     is_homing_(false),
     is_homed_(false),
     homing_start_time_(0),
-    min_position_(-3.1415926535f),  // -PI
-    max_position_(3.1415926535f),   // PI
+    min_position_(-MathUtils::PI),  // -PI
+    max_position_(MathUtils::PI),   // PI
     enabled_(false),
     direction_(false),
     step_interval_(0),
@@ -48,7 +49,7 @@ bool Drive::init(const Config& config, uint8_t drive_id) {
   drive_id_ = drive_id;
 
   // Проверка конфигурации
-  if (config_.step_pin == 0 || config_.dir_pin == 0) {
+  if (!config_.step_pin || !config_.dir_pin) {
     Logger::error("Drive %d: Invalid pin configuration", drive_id_);
     return false;
   }
@@ -56,10 +57,10 @@ bool Drive::init(const Config& config, uint8_t drive_id) {
   // Настройка пинов
   PIN_MODE(config_.step_pin, OUTPUT);
   PIN_MODE(config_.dir_pin, OUTPUT);
-  PIN_MODE(config_.enable_pin, OUTPUT);
-  PIN_MODE(config_.limit_switch_pin, INPUT_PULLUP);
+//  PIN_MODE(config_.enable_pin, OUTPUT);
+//  PIN_MODE(config_.limit_switch_pin, INPUT_PULLUP);
 
-  if (config_.fault_pin != 0) {
+  if (config_.fault_pin) {
     PIN_MODE(config_.fault_pin, INPUT_PULLUP);
   }
 
@@ -79,7 +80,7 @@ void Drive::update(uint32_t delta_time_ms) {
   previous_state_ = state_;
 
   // Проверка ошибок драйвера
-  if (config_.fault_pin != 0 && readFaultPin()) {
+  if (config_.fault_pin && readFaultPin()) {
     if (state_ != STATE_ERROR) {
       Logger::error("Drive %d: Driver fault detected", drive_id_);
       state_ = STATE_ERROR;
@@ -136,21 +137,23 @@ void Drive::update(uint32_t delta_time_ms) {
 }
 
 void Drive::enable() {
-  if (!enabled_) {
-    SET_PIN(config_.enable_pin, LOW);
-    enabled_ = true;
-    Logger::debug("Drive %d: Enabled", drive_id_);
-  }
+  if (enabled_) return;
+
+  //  SET_PIN(config_.enable_pin, LOW);
+  enabled_ = true;
+  //  Logger::debug("Drive %d: Enabled", drive_id_);
+  Logger::debug("Drive %d: Doesn't needs to be enabled", drive_id_);
 }
 
 void Drive::disable() {
-  if (enabled_) {
-    SET_PIN(config_.enable_pin, HIGH);
-    enabled_ = false;
-    current_velocity_ = 0;
-    state_ = STATE_IDLE;
-    Logger::debug("Drive %d: Disabled", drive_id_);
-  }
+  if (!enabled_) return;
+
+  //  SET_PIN(config_.enable_pin, HIGH);
+  enabled_ = false;
+  current_velocity_ = 0;
+  state_ = STATE_IDLE;
+  //  Logger::debug("Drive %d: Disabled", drive_id_);
+  Logger::debug("Drive %d: Doesn't needs to be enabled", drive_id_);
 }
 
 void Drive::setMode(Mode mode) {
@@ -446,13 +449,13 @@ void Drive::updateVelocityProfile() {
 
 float Drive::stepsToRadians(int32_t steps) const {
   float steps_per_rad = (config_.steps_per_revolution * config_.microsteps *
-                         config_.gear_ratio) / 6.283185307f;  // 2*PI
+                         config_.gear_ratio) / MathUtils::TWO_PI;
   return steps / steps_per_rad;
 }
 
 int32_t Drive::radiansToSteps(float radians) const {
   float steps_per_rad = (config_.steps_per_revolution * config_.microsteps *
-                         config_.gear_ratio) / 6.283185307f;
+                         config_.gear_ratio) / MathUtils::TWO_PI;
   return (int32_t)(radians * steps_per_rad + 0.5f);
 }
 
@@ -479,13 +482,13 @@ bool Drive::checkAcceleration(float acceleration) const {
 }
 
 bool Drive::readLimitSwitch() const {
-  if (config_.limit_switch_pin == 0) return false;
+  if (!config_.limit_switch_pin) return false;
   return (READ_PIN(config_.limit_switch_pin) == LOW);
 }
 
 bool Drive::readFaultPin() const {
-  if (config_.fault_pin == 0) return false;
-  return (READ_PIN(config_.fault_pin) == LOW);
+  if (!config_.fault_pin) return false;
+  return (READ_PIN(config_.fault_pin) == HIGH);
 }
 
 float Drive::applyBacklashCompensation(float position) {
@@ -536,10 +539,10 @@ void Drive::setLimits(float min_position, float max_position) {
   max_position_ = max_position;
 }
 
-void Drive::setCurrent(float run_current, float hold_current) {
-  config_.run_current = run_current;
-  config_.hold_current = hold_current;
-}
+//void Drive::setCurrent(float run_current, float hold_current) {
+//  config_.run_current = run_current;
+//  config_.hold_current = hold_current;
+//}
 
 void Drive::setBacklashCompensation(float backlash) {
   config_.backlash_compensation = backlash;

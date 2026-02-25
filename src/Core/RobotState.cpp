@@ -1,4 +1,6 @@
 #include "RobotState.h"
+#include "../../src/utils/MathUtils.h"
+#include "../../config/robot_params.h"
 
 RobotState::RobotState() :
     status(STATUS_IDLE),
@@ -14,9 +16,8 @@ RobotState::RobotState() :
     is_paused(false),
     is_emergency(false) {
 
-  joint_positions[0] = joint_positions[1] = joint_positions[2] = 0;
-  joint_velocities[0] = joint_velocities[1] = joint_velocities[2] = 0;
-  target_joints[0] = target_joints[1] = target_joints[2] = 0;
+  joint_positions[0] = joint_positions[1] = joint_positions[2] = joint_positions[3] = 0;
+  joint_velocities[0] = joint_velocities[1] = joint_velocities[2] = joint_velocities[3] = 0;
   error_message[0] = '\0';
 }
 
@@ -34,6 +35,7 @@ String RobotState::serialize() const {
   json += String(joint_positions[0], 4) + ",";
   json += String(joint_positions[1], 4) + ",";
   json += String(joint_positions[2], 4) + "],";
+  json += String(joint_positions[3], 4) + "],";
 
   json += "\"target\":{";
   json += "\"x\":" + String(target_position.x, 2) + ",";
@@ -78,11 +80,13 @@ void RobotState::print() const {
   Serial.println(") mm");
 
   Serial.print("Joints: (");
-  Serial.print(joint_positions[0] * 57.2958f, 2);
+  Serial.print(joint_positions[0] * MathUtils::RAD_TO_DEG, 2);
   Serial.print(", ");
-  Serial.print(joint_positions[1] * 57.2958f, 2);
+  Serial.print(joint_positions[1] * MathUtils::RAD_TO_DEG, 2);
   Serial.print(", ");
-  Serial.print(joint_positions[2] * 57.2958f, 2);
+  Serial.print(joint_positions[2] * MathUtils::RAD_TO_DEG, 2);
+  Serial.print(", ");
+  Serial.print(joint_positions[3] * MathUtils::RAD_TO_DEG, 2);
   Serial.println(") deg");
 
   Serial.print("Velocity: ");

@@ -3,12 +3,13 @@
 #include <Arduino.h>
 #include "Drive.h"
 #include "../../src/utils/CircularBuffer.h"
+#include "../../config/robot_params.h"
 
 class DrivesController {
 public:
   // Конфигурация контроллера
   struct Config {
-    Drive::Config drive_configs[3];  // обычный массив вместо std::array
+    Drive::Config drive_configs[RobotParams::MOTORS_COUNT];  // обычный массив вместо std::array
     float sync_tolerance;          // Допуск синхронизации (рад)
     uint32_t sync_timeout;         // Таймаут синхронизации (мс)
     bool enable_sync_move;         // Включить синхронное движение
@@ -51,14 +52,14 @@ public:
     };
 
     Type type;
-    float positions[3];      // Позиции для осей (радианы)
-    float velocities[3];     // Скорости для осей (рад/с)
+    float positions[RobotParams::MOTORS_COUNT];      // Позиции для осей (радианы)
+    float velocities[RobotParams::MOTORS_COUNT];     // Скорости для осей (рад/с)
     float acceleration;      // Ускорение (рад/с²)
     uint32_t timeout;        // Таймаут (мс)
 
     Command() : type(STOP), acceleration(0), timeout(0) {
-      positions[0] = positions[1] = positions[2] = 0;
-      velocities[0] = velocities[1] = velocities[2] = 0;
+      positions[0] = positions[1] = positions[2] = positions[3] = 0;
+      velocities[0] = velocities[1] = velocities[2] = velocities[3] = 0;
     }
   };
 
@@ -77,9 +78,9 @@ public:
   void clearCommandQueue();
 
   // Прямое управление приводами
-  bool moveToPosition(const float positions[3], float velocity = 0);
-  bool moveToPositionSync(const float positions[3], float velocity = 0);
-  bool setVelocities(const float velocities[3]);
+  bool moveToPosition(const float positions[RobotParams::MOTORS_COUNT], float velocity = 0);
+  bool moveToPositionSync(const float positions[RobotParams::MOTORS_COUNT], float velocity = 0);
+  bool setVelocities(const float velocities[RobotParams::MOTORS_COUNT]);
 
   // Homing
   bool homeAll();
@@ -99,9 +100,9 @@ public:
   // Получение состояния
   State getState() const { return state_; }
   Mode getMode() const { return mode_; }
-  void getPositions(float positions[3]) const;
-  void getVelocities(float velocities[3]) const;
-  void getTargetPositions(float targets[3]) const;
+  void getPositions(float positions[RobotParams::MOTORS_COUNT]) const;
+  void getVelocities(float velocities[RobotParams::MOTORS_COUNT]) const;
+  void getTargetPositions(float targets[RobotParams::MOTORS_COUNT]) const;
 
   // Получение состояния отдельных приводов
   Drive::State getDriveState(uint8_t index) const;
@@ -135,7 +136,7 @@ private:
   Config config_;
 
   // Приводы
-  Drive drives_[3];
+  Drive drives_[RobotParams::MOTORS_COUNT];
 
   // Состояние
   State state_;
@@ -151,7 +152,7 @@ private:
   // Синхронизация
   bool sync_in_progress_;
   uint32_t sync_start_time_;
-  bool sync_drives_done_[3];
+  bool sync_drives_done_[RobotParams::MOTORS_COUNT];
 
   // Статистика
   uint32_t commands_executed_;
@@ -181,7 +182,7 @@ private:
 
   // Вспомогательные методы
   bool checkDrivesReady() const;
-  bool checkPositionsValid(const float positions[3]) const;
-  bool checkVelocitiesValid(const float velocities[3]) const;
+  bool checkPositionsValid(const float positions[RobotParams::MOTORS_COUNT]) const;
+  bool checkVelocitiesValid(const float velocities[RobotParams::MOTORS_COUNT]) const;
   void updateControllerState();
 };

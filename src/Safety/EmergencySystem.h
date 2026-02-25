@@ -9,15 +9,18 @@ public:
   enum ErrorCode : uint16_t {
     NONE               = 0x0000,
     ESTOP_BUTTON       = 0x0001,  // Нажата аварийная кнопка
-    LIMIT_SWITCH_1     = 0x0002,  // Сработал концевик 1
-    LIMIT_SWITCH_2     = 0x0004,  // Сработал концевик 2
-    LIMIT_SWITCH_3     = 0x0008,  // Сработал концевик 3
-    DRIVER_FAULT_1     = 0x0010,  // Ошибка драйвера 1
-    DRIVER_FAULT_2     = 0x0020,  // Ошибка драйвера 2
-    DRIVER_FAULT_3     = 0x0040,  // Ошибка драйвера 3
-    OVERCURRENT_1      = 0x0080,  // Перегруз по току 1
-    OVERCURRENT_2      = 0x0100,  // Перегруз по току 2
-    OVERCURRENT_3      = 0x0200,  // Перегруз по току 3
+    LIMIT_SWITCH_1     = 0x0011,  // Сработал концевик 1
+    LIMIT_SWITCH_2     = 0x0012,  // Сработал концевик 2
+    LIMIT_SWITCH_3     = 0x0013,  // Сработал концевик 3
+    LIMIT_SWITCH_4     = 0x0014,  // Сработал концевик 3
+    DRIVER_FAULT_1     = 0x0021,  // Ошибка драйвера 1
+    DRIVER_FAULT_2     = 0x0022,  // Ошибка драйвера 2
+    DRIVER_FAULT_3     = 0x0023,  // Ошибка драйвера 3
+    DRIVER_FAULT_4     = 0x0024,  // Ошибка драйвера 3
+    OVERCURRENT_1      = 0x0031,  // Перегруз по току 1
+    OVERCURRENT_2      = 0x0032,  // Перегруз по току 2
+    OVERCURRENT_3      = 0x0033,  // Перегруз по току 3
+    OVERCURRENT_4      = 0x0034,  // Перегруз по току 3
     OVERTEMPERATURE    = 0x0400,  // Перегрев
     UNDERVOLTAGE       = 0x0800,  // Низкое напряжение
     OVERVOLTAGE        = 0x1000,  // Высокое напряжение

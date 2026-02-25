@@ -153,53 +153,61 @@ EmergencySystem::LimitSwitchConfig createLimitSwitchConfig() {
 
 // Конфигурация приводов
 Drive::Config createDriveConfig(uint8_t drive_index) {
-Drive::Config config;
+  Drive::Config config;
 
-switch (drive_index) {
-case 0:
-config.step_pin = Pins::DRIVE_1.step_pin;
-config.dir_pin = Pins::DRIVE_1.dir_pin;
-config.enable_pin = Pins::DRIVE_1.enable_pin;
-config.limit_switch_pin = Pins::DRIVE_1.limit_switch_pin;
-config.fault_pin = Pins::DRIVE_1.fault_pin;
-break;
+  switch (drive_index) {
+    case 0:
+      config.step_pin = Pins::DRIVE_1.step_pin;
+      config.dir_pin = Pins::DRIVE_1.dir_pin;
+      //config.enable_pin = Pins::DRIVE_1.enable_pin;
+      config.limit_switch_pin = Pins::DRIVE_1.limit_switch_pin;
+      config.fault_pin = Pins::DRIVE_1.fault_pin;
+      break;
 
-case 1:
-config.step_pin = Pins::DRIVE_2.step_pin;
-config.dir_pin = Pins::DRIVE_2.dir_pin;
-config.enable_pin = Pins::DRIVE_2.enable_pin;
-config.limit_switch_pin = Pins::DRIVE_2.limit_switch_pin;
-config.fault_pin = Pins::DRIVE_2.fault_pin;
-break;
+    case 1:
+      config.step_pin = Pins::DRIVE_2.step_pin;
+      config.dir_pin = Pins::DRIVE_2.dir_pin;
+      //config.enable_pin = Pins::DRIVE_2.enable_pin;
+      config.limit_switch_pin = Pins::DRIVE_2.limit_switch_pin;
+      config.fault_pin = Pins::DRIVE_2.fault_pin;
+      break;
 
-case 2:
-config.step_pin = Pins::DRIVE_3.step_pin;
-config.dir_pin = Pins::DRIVE_3.dir_pin;
-config.enable_pin = Pins::DRIVE_3.enable_pin;
-config.limit_switch_pin = Pins::DRIVE_3.limit_switch_pin;
-config.fault_pin = Pins::DRIVE_3.fault_pin;
-break;
-}
+    case 2:
+      config.step_pin = Pins::DRIVE_3.step_pin;
+      config.dir_pin = Pins::DRIVE_3.dir_pin;
+      //config.enable_pin = Pins::DRIVE_3.enable_pin;
+      config.limit_switch_pin = Pins::DRIVE_3.limit_switch_pin;
+      config.fault_pin = Pins::DRIVE_3.fault_pin;
+      break;
 
-// Общие параметры приводов
-config.steps_per_revolution = RobotParams::STEPS_PER_REVOLUTION;
-config.microsteps = RobotParams::MICROSTEPS;
-config.gear_ratio = RobotParams::GEAR_RATIO;
+    case 3:
+      config.step_pin = Pins::DRIVE_4.step_pin;
+      config.dir_pin = Pins::DRIVE_4.dir_pin;
+      //config.enable_pin = Pins::DRIVE_4.enable_pin;
+      config.limit_switch_pin = Pins::DRIVE_4.limit_switch_pin;
+      config.fault_pin = Pins::DRIVE_4.fault_pin;
+      break;
+  }
 
-config.max_velocity = 5.0f; // рад/с
-config.max_acceleration = 20.0f; // рад/с²
+  // Общие параметры приводов
+  config.steps_per_revolution = RobotParams::STEPS_PER_REVOLUTION;
+  config.microsteps = RobotParams::MICROSTEPS;
+  config.gear_ratio = RobotParams::GEAR_RATIO;
 
-config.homing_velocity = 1.0f; // рад/с
-config.homing_acceleration = 5.0f; // рад/с²
-config.homing_direction = Drive::HOMING_NEGATIVE;
+  config.max_velocity = 5.0f; // рад/с
+  config.max_acceleration = 20.0f; // рад/с²
 
-config.run_current = 1.5f; // А
-config.hold_current = 0.8f; // А
+  config.homing_velocity = 1.0f; // рад/с
+  config.homing_acceleration = 5.0f; // рад/с²
+  config.homing_direction = Drive::HOMING_NEGATIVE;
 
-config.backlash_compensation = 0.001f; // рад
-config.invert_direction = false;
+  //config.run_current = 1.5f; // А
+  //config.hold_current = 0.8f; // А
 
-return config;
+  config.backlash_compensation = 0.001f; // рад
+  config.invert_direction = false;
+
+  return config;
 }
 
 // Конфигурация контроллера приводов
@@ -210,6 +218,7 @@ DrivesController::Config createDrivesControllerConfig() {
   config.drive_configs[0] = createDriveConfig(0);
   config.drive_configs[1] = createDriveConfig(1);
   config.drive_configs[2] = createDriveConfig(2);
+  config.drive_configs[3] = createDriveConfig(3);
 
   config.sync_tolerance = 0.01f; // рад
   config.sync_timeout = 5000; // мс
@@ -228,7 +237,7 @@ DeltaSolver::DeltaConfig createKinematicsConfig() {
   config.arm_length = RobotParams::ARM_LENGTH;
   config.forearm_length = RobotParams::FOREARM_LENGTH;
 
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     config.base_angles[i] = RobotParams::BASE_ANGLES[i] * (M_PI / 180.0f);
   }
 
@@ -423,7 +432,7 @@ void runDiagnostics() {
 
   // 2. Проверка состояния приводов
   Logger::info("Drive states:");
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < RobotParams::MOTORS_COUNT; i++) {
     // Здесь нужно получить состояние каждого привода через Core
     Logger::info("  Drive %d: [status]", i);
   }

@@ -67,7 +67,7 @@ void FeedbackReader::update() {
     case POTENTIOMETER:
       updateAnalog();
       // Простое преобразование 0-4095 → 0-2π
-      data_.position = (analog_raw_ / 4095.0f) * 6.283185307f;
+      data_.position = (analog_raw_ / 4095.0f) * MathUtils::TWO_PI;
       break;
 
     default:

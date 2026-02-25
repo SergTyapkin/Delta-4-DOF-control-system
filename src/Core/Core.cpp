@@ -2,6 +2,7 @@
 #include "Core.h"
 #include "../../src/utils/Logger.h"
 #include "../../src/Core/TrajectoryGenerator.h"
+#include "../../config/robot_params.h"
 
 Core::Core() :
     mode_(MODE_IDLE),
@@ -82,9 +83,11 @@ bool Core::init(const Config& config) {
   robot_state_.joint_positions[0] = 0;
   robot_state_.joint_positions[1] = 0;
   robot_state_.joint_positions[2] = 0;
+  robot_state_.joint_positions[3] = 0;
   robot_state_.joint_velocities[0] = 0;
   robot_state_.joint_velocities[1] = 0;
   robot_state_.joint_velocities[2] = 0;
+  robot_state_.joint_velocities[3] = 0;
   robot_state_.error_code = 0;
   robot_state_.error_message[0] = '\0';
 
@@ -190,12 +193,13 @@ bool Core::moveToPoint(const Vector3& point, float velocity, TrajectoryGenerator
   return (executeCommand(cmd) != 0);
 }
 
-bool Core::moveJoints(const float angles[3], float velocity) {
+bool Core::moveJoints(const float angles[RobotParams::MOTORS_COUNT], float velocity) {
   Command cmd;
   cmd.type = Command::CMD_MOVE_JOINTS;
   cmd.joint_angles[0] = angles[0];
   cmd.joint_angles[1] = angles[1];
   cmd.joint_angles[2] = angles[2];
+  cmd.joint_angles[3] = angles[3];
   cmd.velocity = (velocity > 0) ? velocity : config_.default_velocity;
 
   return (executeCommand(cmd) != 0);
@@ -206,12 +210,13 @@ bool Core::setCartesianVelocity(const Vector3& velocity) {
   return false;
 }
 
-bool Core::setJointVelocity(const float velocities[3]) {
+bool Core::setJointVelocity(const float velocities[RobotParams::MOTORS_COUNT]) {
   DrivesController::Command drive_cmd;
   drive_cmd.type = DrivesController::Command::SET_VELOCITY;
   drive_cmd.velocities[0] = velocities[0];
   drive_cmd.velocities[1] = velocities[1];
   drive_cmd.velocities[2] = velocities[2];
+  drive_cmd.velocities[3] = velocities[3];
 
   return drives_controller_.executeCommand(drive_cmd);
 }
@@ -304,10 +309,11 @@ Vector3 Core::getCurrentPosition() const {
   return robot_state_.effector_position;
 }
 
-void Core::getCurrentJoints(float angles[3]) const {
+void Core::getCurrentJoints(float angles[RobotParams::MOTORS_COUNT]) const {
   angles[0] = robot_state_.joint_positions[0];
   angles[1] = robot_state_.joint_positions[1];
   angles[2] = robot_state_.joint_positions[2];
+  angles[3] = robot_state_.joint_positions[3];
 }
 
 bool Core::isMoving() const {
@@ -522,17 +528,19 @@ void Core::executeCurrentCommand() {
 
 void Core::updateState() {
   // Обновляем углы шарниров от контроллера приводов
-  float positions[3], velocities[3];
+  float positions[RobotParams::MOTORS_COUNT], velocities[RobotParams::MOTORS_COUNT];
   drives_controller_.getPositions(positions);
   drives_controller_.getVelocities(velocities);
 
   robot_state_.joint_positions[0] = positions[0];
   robot_state_.joint_positions[1] = positions[1];
   robot_state_.joint_positions[2] = positions[2];
+  robot_state_.joint_positions[3] = positions[3];
 
   robot_state_.joint_velocities[0] = velocities[0];
   robot_state_.joint_velocities[1] = velocities[1];
   robot_state_.joint_velocities[2] = velocities[2];
+  robot_state_.joint_velocities[3] = velocities[3];
 
   // Обновляем позицию эффектора через прямую кинематику
   Vector3 effector_position;
@@ -567,7 +575,7 @@ void Core::updateTrajectory() {
   Vector3 next_point;
   if (trajectory_generator_.getNextPoint(next_point, trajectory_update_interval_)) {
     // Двигаемся к следующей точке траектории
-    float joint_angles[3];
+    float joint_angles[RobotParams::MOTORS_COUNT];
     if (convertToJointAngles(next_point, joint_angles)) {
       // Используем прямой контроль шарниров для точности
       DrivesController::Command cmd;
@@ -575,9 +583,11 @@ void Core::updateTrajectory() {
       cmd.positions[0] = joint_angles[0];
       cmd.positions[1] = joint_angles[1];
       cmd.positions[2] = joint_angles[2];
+      cmd.positions[3] = joint_angles[3];
       cmd.velocities[0] = config_.default_velocity;
       cmd.velocities[1] = config_.default_velocity;
       cmd.velocities[2] = config_.default_velocity;
+      cmd.velocities[3] = config_.default_velocity;
 
       drives_controller_.executeCommand(cmd);
     }
@@ -597,7 +607,7 @@ bool Core::handleMoveToPoint(const Command& cmd) {
     return false;
   }
 
-  float joint_angles[3];
+  float joint_angles[RobotParams::MOTORS_COUNT];
   if (!convertToJointAngles(cmd.target_point, joint_angles)) {
     logCommand(cmd, STATUS_FAILED, 2002, "IK solution not found");
     return false;
@@ -616,9 +626,9 @@ bool Core::handleMoveToPoint(const Command& cmd) {
   drive_cmd.positions[0] = joint_angles[0];
   drive_cmd.positions[1] = joint_angles[1];
   drive_cmd.positions[2] = joint_angles[2];
-  drive_cmd.velocities[0] = cmd.velocity > 0 ? cmd.velocity : config_.default_velocity;
-  drive_cmd.velocities[1] = cmd.velocity > 0 ? cmd.velocity : config_.default_velocity;
-  drive_cmd.velocities[2] = cmd.velocity > 0 ? cmd.velocity : config_.default_velocity;
+  drive_cmd.positions[3] = joint_angles[3];
+  drive_cmd.velocities[0] = drive_cmd.velocities[1] = drive_cmd.velocities[2] = drive_cmd.velocities[3] =
+   cmd.velocity > 0 ? cmd.velocity : config_.default_velocity;
 
   bool success = drives_controller_.executeCommand(drive_cmd);
 
@@ -644,9 +654,9 @@ bool Core::handleMoveJoints(const Command& cmd) {
   drive_cmd.positions[0] = cmd.joint_angles[0];
   drive_cmd.positions[1] = cmd.joint_angles[1];
   drive_cmd.positions[2] = cmd.joint_angles[2];
-  drive_cmd.velocities[0] = cmd.velocity > 0 ? cmd.velocity : config_.default_velocity;
-  drive_cmd.velocities[1] = cmd.velocity > 0 ? cmd.velocity : config_.default_velocity;
-  drive_cmd.velocities[2] = cmd.velocity > 0 ? cmd.velocity : config_.default_velocity;
+  drive_cmd.positions[3] = cmd.joint_angles[3];
+  drive_cmd.velocities[0] = drive_cmd.velocities[1] = drive_cmd.velocities[2] = drive_cmd.velocities[3] =
+      cmd.velocity > 0 ? cmd.velocity : config_.default_velocity;
 
   bool success = drives_controller_.executeCommand(drive_cmd);
 
@@ -815,7 +825,7 @@ bool Core::handleCalibrate(const Command& cmd) {
   return success;
 }
 
-bool Core::convertToJointAngles(const Vector3& point, float angles[3]) {
+bool Core::convertToJointAngles(const Vector3& point, float angles[RobotParams::MOTORS_COUNT]) {
   DeltaSolver::Solution solution = kinematics_.inverseKinematicsSafe(point);
 
   if (!solution.valid) {
@@ -827,6 +837,7 @@ bool Core::convertToJointAngles(const Vector3& point, float angles[3]) {
   angles[0] = solution.angles[0];
   angles[1] = solution.angles[1];
   angles[2] = solution.angles[2];
+  angles[3] = solution.angles[3];
 
   return true;
 }
@@ -850,7 +861,7 @@ bool Core::checkPointSafety(const Vector3& point) {
   return true;
 }
 
-bool Core::checkJointSafety(const float angles[3]) {
+bool Core::checkJointSafety(const float angles[RobotParams::MOTORS_COUNT]) {
   return Limits::SafetyCheck::areJointAnglesSafe(angles);
 }
 
@@ -1016,14 +1027,15 @@ void Core::printStatus() const {
                current_command_.id, current_command_status_);
 
   Vector3 pos = getCurrentPosition();
-  float joints[3];
+  float joints[RobotParams::MOTORS_COUNT];
   getCurrentJoints(joints);
 
   Logger::info("Position: (%.1f, %.1f, %.1f) mm", pos.x, pos.y, pos.z);
   Logger::info("Joints: (%.2f, %.2f, %.2f) deg",
                joints[0] * MathUtils::RAD_TO_DEG,
                joints[1] * MathUtils::RAD_TO_DEG,
-               joints[2] * MathUtils::RAD_TO_DEG);
+               joints[2] * MathUtils::RAD_TO_DEG,
+               joints[3] * MathUtils::RAD_TO_DEG);
 }
 
 void Core::printKinematicsInfo() const {

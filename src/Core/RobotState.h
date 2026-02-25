@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include "../../src/utils/Vector3.h"
+#include "../../config/robot_params.h"
 
 struct RobotState {
   // Статус робота
@@ -22,12 +23,11 @@ struct RobotState {
   Vector3 effector_position;
 
   // Позиции и скорости шарниров (радианы, рад/с)
-  float joint_positions[3];
-  float joint_velocities[3];
+  float joint_positions[RobotParams::MOTORS_COUNT];
+  float joint_velocities[RobotParams::MOTORS_COUNT];
 
   // Целевые значения
   Vector3 target_position;
-  float target_joints[3];
 
   // Информация о движении
   float current_velocity;     // Текущая скорость (мм/с)

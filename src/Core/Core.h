@@ -7,6 +7,7 @@
 #include "../../src/DrivesController/DrivesController.h"
 #include "../../src/utils/CircularBuffer.h"
 #include "../../config/limits.h"
+#include "../../config/robot_params.h"
 
 class Core {
 public:
@@ -55,7 +56,7 @@ public:
 
     Type type;
     Vector3 target_point;
-    float joint_angles[3];
+    float joint_angles[RobotParams::MOTORS_COUNT];
     TrajectoryGenerator::TrajectoryType trajectory_type;
     float velocity;
     float acceleration;
@@ -70,7 +71,7 @@ public:
         acceleration(0),
         id(0),
         timeout(10000) {
-      joint_angles[0] = joint_angles[1] = joint_angles[2] = 0;
+      joint_angles[0] = joint_angles[1] = joint_angles[2] = joint_angles[3] = 0;
     }
   };
 
@@ -117,9 +118,9 @@ public:
   // Управление движением
   bool moveToPoint(const Vector3& point, float velocity = 0,
                    TrajectoryGenerator::TrajectoryType traj_type = TrajectoryGenerator::TRAJ_LINEAR);
-  bool moveJoints(const float angles[3], float velocity = 0);
+  bool moveJoints(const float angles[RobotParams::MOTORS_COUNT], float velocity = 0);
   bool setCartesianVelocity(const Vector3& velocity);
-  bool setJointVelocity(const float velocities[3]);
+  bool setJointVelocity(const float velocities[RobotParams::MOTORS_COUNT]);
 
   // Homing и калибровка
   bool performHoming();
@@ -138,7 +139,7 @@ public:
   RobotState getState() const;
   CommandStatus getCommandStatus(uint32_t command_id) const;
   Vector3 getCurrentPosition() const;
-  void getCurrentJoints(float angles[3]) const;
+  void getCurrentJoints(float angles[RobotParams::MOTORS_COUNT]) const;
   bool isMoving() const;
   bool isHomed() const;
   bool isReady() const;
@@ -244,9 +245,9 @@ private:
   bool handleCalibrate(const Command& cmd);
 
   // Вспомогательные методы
-  bool convertToJointAngles(const Vector3& point, float angles[3]);
+  bool convertToJointAngles(const Vector3& point, float angles[RobotParams::MOTORS_COUNT]);
   bool checkPointSafety(const Vector3& point);
-  bool checkJointSafety(const float angles[3]);
+  bool checkJointSafety(const float angles[RobotParams::MOTORS_COUNT]);
   void logCommand(const Command& cmd, CommandStatus status,
                   uint16_t error_code = 0, const char* error_msg = "");
 

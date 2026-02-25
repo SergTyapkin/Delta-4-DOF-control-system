@@ -466,33 +466,6 @@ bool UI::handleResetStaticWrapper(UI* ui, const String& args) {return ui->handle
 bool UI::handleListStaticWrapper(UI* ui, const String& args) {return ui->handleList(args);}
 bool UI::handleModeStaticWrapper(UI* ui, const String& args) {return ui->handleMode(args);}
 
-Vector3 UI::parsePoint(const String& args) const {
-  Vector3 point(0, 0, 0);
-  char* token = strtok((char*)args.c_str(), " ");
-  int count = 0;
-
-  while (token != nullptr && count < 3) {
-    (&point.x)[count] = atof(token);
-    token = strtok(nullptr, " ");
-    count++;
-  }
-
-  return point;
-}
-
-Vector3 UI::parseJoints(const String& args) const {
-  float angles[3] = {0, 0, 0};
-  char* token = strtok((char*)args.c_str(), " ");
-  int count = 0;
-
-  while (token != nullptr && count < 3) {
-    angles[count] = atof(token) * MathUtils::DEG_TO_RAD;
-    token = strtok(nullptr, " ");
-    count++;
-  }
-
-  return Vector3(angles[0], angles[1], angles[2]);
-}
 
 void UI::printWelcomeMessage() {
   Serial.println();
