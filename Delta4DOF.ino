@@ -489,13 +489,26 @@ void setup() {
   // Задержка для стабилизации питания
   delay(100);
 
+  // Показываем, что программа начала выполняться
+  digitalWrite(Pins::Status::LED_READY, HIGH);
+  delay(100);
+  digitalWrite(Pins::Status::LED_MOVING, HIGH);
+  delay(100);
+  digitalWrite(Pins::Status::LED_ERROR, HIGH);
+  delay(100);
+  digitalWrite(Pins::Status::LED_READY, LOW);
+  delay(100);
+  digitalWrite(Pins::Status::LED_MOVING, LOW);
+  delay(100);
+  digitalWrite(Pins::Status::LED_ERROR, LOW);
+
   // Инициализация последовательного порта
   Serial.begin(115200);
   while (!Serial) {
     delay(10);
   }
 
-  Logger::init(Logger::LEVEL_INFO);
+  Logger::init(Logger::LEVEL_DEBUG);
 
   Logger::info("");
   Logger::info("========================================");

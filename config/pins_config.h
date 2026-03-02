@@ -1,5 +1,7 @@
 #pragma once
 
+#include "pins_stm32_nucleo_names.h"
+
 // ============================================================================
 // Конфигурация пинов для STM32 Nucleo-F401RE
 // ============================================================================
@@ -19,99 +21,95 @@ namespace Pins {
 
 // Привод 1
   constexpr DrivePins DRIVE_1 = {
-      .step_pin          = 24, // Шаг
-      .dir_pin           = 15, // Направление
+      .step_pin          = PE_13, // Шаг
+      .dir_pin           = PC_7, // Направление
 //      .enable_pin        = 0,  // Разрешение
-      .limit_switch_pin  = 23, // Концевик
-      .fault_pin         = 18  // Ошибка драйвера
+      .limit_switch_pin  = PC_2, // Концевик
+      .fault_pin         = PD_7  // Ошибка драйвера
   };
 
 // Привод 2
   constexpr DrivePins DRIVE_2 = {
-      .step_pin          = 26, // Шаг
-      .dir_pin           = 17, // Направление
+      .step_pin          = PF_15, // Шаг
+      .dir_pin           = PB_5, // Направление
 //      .enable_pin        = 0,  // Разрешение
-      .limit_switch_pin  = 25, // Концевик
-      .fault_pin         = 18  // Ошибка драйвера
+      .limit_switch_pin  = PF_4, // Концевик
+      .fault_pin         = PD_7  // Ошибка драйвера
   };
 
 // Привод 3
   constexpr DrivePins DRIVE_3 = {
-      .step_pin          = 28, // Шаг
-      .dir_pin           = 19, // Направление
+      .step_pin          = PG_14, // Шаг
+      .dir_pin           = PB_3, // Направление
 //      .enable_pin        = 0,  // Разрешение
-      .limit_switch_pin  = 27, // Концевик
-      .fault_pin         = 18  // Ошибка драйвера
+      .limit_switch_pin  = PB_6, // Концевик
+      .fault_pin         = PD_7  // Ошибка драйвера
   };
 
 // Привод 4
   constexpr DrivePins DRIVE_4 = {
-      .step_pin          = 30, // PB0,   // Шаг
-      .dir_pin           = 21, // PB1,   // Направление
-//      .enable_pin        = 0, // PB2,   // Разрешение
-      .limit_switch_pin  = 29, // PA0,   // Концевик
-      .fault_pin         = 18 // PA3    // Ошибка драйвера
+      .step_pin          = PG_9,  // Шаг
+      .dir_pin           = PA_4,  // Направление
+//      .enable_pin        = 0,  // Разрешение
+      .limit_switch_pin  = PB_2,  // Концевик
+      .fault_pin         = PD_7   // Ошибка драйвера
   };
-
-// Массив всех приводов для удобства итераций
-constexpr DrivePins ALL_DRIVES[] = {DRIVE_1, DRIVE_2, DRIVE_3, DRIVE_4};
-constexpr uint8_t NUM_DRIVES = 4;
 
 // ----------------------------------------------------------------------------
 // Система безопасности
 // ----------------------------------------------------------------------------
 namespace Safety {
-  constexpr uint8_t EMERGENCY_STOP_BUTTON = 13; // PC13;  // Синяя пользовательская кнопка
-  constexpr uint8_t ESTOP_OUTPUT          = 5; // PB5;   // Выход для внешней аварийной цепи
-  constexpr uint8_t BUZZER                = 9; // PB9;   // Зуммер для предупреждений
+  constexpr uint8_t EMERGENCY_STOP_BUTTON = BUTTON_USER; // Синяя пользовательская кнопка
+  constexpr uint8_t ESTOP_OUTPUT          = PC_8;  // Выход для внешней аварийной цепи
+  constexpr uint8_t BUZZER                = PC_9;  // Зуммер для предупреждений
 }
 
 // ----------------------------------------------------------------------------
 // Индикация состояния
 // ----------------------------------------------------------------------------
 namespace Status {
-  constexpr uint8_t LED_READY    = 5; // PA5;   // Зеленый LED на Nucleo (LD2)
-  constexpr uint8_t LED_MOVING   = 3; // PB3;   // Дополнительный LED (синий)
-  constexpr uint8_t LED_ERROR    = 4; // PB4;   // Дополнительный LED (красный)
+  constexpr uint8_t LED_READY    = LED_GREEN;  // Зеленый LED на Nucleo (LD2)
+  constexpr uint8_t LED_MOVING   = LED_BLUE;  // Дополнительный LED (синий)
+  constexpr uint8_t LED_ERROR    = LED_RED;  // Дополнительный LED (красный)
 }
 
 // ----------------------------------------------------------------------------
 // Пользовательский интерфейс
 // ----------------------------------------------------------------------------
-namespace UI {
-  constexpr uint8_t USER_BUTTON_1 = 0; // PC0;  // Дополнительные кнопки
-  constexpr uint8_t USER_BUTTON_2 = 1; // PC1;
-  constexpr uint8_t POTENTIOMETER = 6; // PA6;  // Потенциометр для ручного управления
-}
+//namespace UI {
+//  constexpr uint8_t USER_BUTTON_1 = PC_10; // Дополнительная кнопка
+//  constexpr uint8_t USER_BUTTON_2 = PC_11; // Дополнительная кнопка
+//  constexpr uint8_t POTENTIOMETER = PC_12; // Потенциометр для ручного управления
+//}
 
 // ----------------------------------------------------------------------------
 // Коммуникации
 // ----------------------------------------------------------------------------
-namespace Comms {
-  // UART1 уже используется Serial (PA9-TX, PA10-RX)
-  constexpr uint8_t UART2_TX = 2; // PA2;
-  constexpr uint8_t UART2_RX = 3; // PA3;
-
-  // I2C для дополнительных датчиков
-  constexpr uint8_t I2C1_SDA = 7; // PB7;
-  constexpr uint8_t I2C1_SCL = 6; // PB6;
-
-  // SPI для энкодеров или других устройств
-  constexpr uint8_t SPI1_MOSI = 7; // PA7;
-  constexpr uint8_t SPI1_MISO = 6; // PA6;
-  constexpr uint8_t SPI1_SCK  = 5; // PA5;
-  constexpr uint8_t SPI1_CS   = 4; // PA4;
-}
+//namespace Comms {
+//  // UART1 уже используется Serial (PA9-TX, PA10-RX)
+//  constexpr uint8_t UART2_TX = 2;
+//  constexpr uint8_t UART2_RX = 3;
+//
+//  // I2C для дополнительных датчиков
+//  constexpr uint8_t I2C1_SDA = 7;
+//  constexpr uint8_t I2C1_SCL = 6;
+//
+//  // SPI для энкодеров или других устройств
+//  constexpr uint8_t SPI1_MOSI = 7;
+//  constexpr uint8_t SPI1_MISO = 6;
+//  constexpr uint8_t SPI1_SCK  = 5;
+//  constexpr uint8_t SPI1_CS   = 4;
+//}
 
 // ----------------------------------------------------------------------------
 // Аналоговые входы
 // ----------------------------------------------------------------------------
-namespace Analog {
-  constexpr uint8_t CURRENT_SENSE_1 = 0; // PA0;  // Ток двигателя 1
-  constexpr uint8_t CURRENT_SENSE_2 = 1; // PA1;  // Ток двигателя 2
-  constexpr uint8_t CURRENT_SENSE_3 = 4; // PA4;  // Ток двигателя 3
-  constexpr uint8_t TEMPERATURE     = 2; // PC2;  // Датчик температуры
-  constexpr uint8_t VOLTAGE_12V     = 3; // PC3;  // Мониторинг питания
-}
+//namespace Analog {
+//  constexpr uint8_t CURRENT_SENSE_1 = 0; // PA0;  // Ток двигателя 1
+//  constexpr uint8_t CURRENT_SENSE_2 = 1; // PA1;  // Ток двигателя 2
+//  constexpr uint8_t CURRENT_SENSE_3 = 4; // PA4;  // Ток двигателя 3
+//  constexpr uint8_t TEMPERATURE     = 2; // PC2;  // Датчик температуры
+//  constexpr uint8_t VOLTAGE_12V     = 3; // PC3;  // Мониторинг питания
+//}
 
 } // namespace Pins

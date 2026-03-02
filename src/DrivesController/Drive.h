@@ -23,9 +23,9 @@ public:
   };
 
   // Направление homing
-  enum HomingDirection {
-    HOMING_POSITIVE,
-    HOMING_NEGATIVE
+  enum DriveDirection {
+    DIRECTION_POSITIVE,
+    DIRECTION_NEGATIVE
   };
 
   // Конфигурация привода
@@ -49,7 +49,7 @@ public:
     // Параметры homing
     float homing_velocity;
     float homing_acceleration;
-    HomingDirection homing_direction;
+    DriveDirection homing_direction;
 
     // Ток
     //    float run_current;
@@ -66,7 +66,7 @@ public:
         steps_per_revolution(200.0f), microsteps_per_revolution(16.0f), gear_ratio(1.0f),
         max_velocity(10.0f), max_acceleration(50.0f),
         homing_velocity(2.0f), homing_acceleration(10.0f),
-        homing_direction(HOMING_NEGATIVE),
+        homing_direction(DIRECTION_NEGATIVE),
         //        run_current(1.0f), hold_current(0.5f),
         backlash_compensation(0.0f), invert_direction(false) {}
   };
@@ -136,7 +136,6 @@ public:
 
   // Отладка
   void printDebugInfo() const;
-
 private:
   // Конфигурация
   Config config_;
@@ -164,7 +163,7 @@ private:
 
   // Управление шагами
   bool enabled_;
-  bool direction_;
+  DriveDirection direction_;
   uint32_t step_interval_;
   uint32_t last_step_time_;
   int32_t steps_remaining_;
@@ -217,9 +216,9 @@ private:
   void handleVelocityControl(uint32_t delta_time_ms);
 
   // Аппаратно-зависимые методы
-  void setStepPin(bool high);
-  void setDirectionPin(bool direction);
-  void setEnablePin(bool enable);
+  void setStepPin(bool high) const;
+  void setDirectionPin(DriveDirection direction) const;
+  void setEnablePin(bool enable) const;
   bool readLimitSwitch() const;
   bool readFaultPin() const;
 

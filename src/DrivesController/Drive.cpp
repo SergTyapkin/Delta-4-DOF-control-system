@@ -24,7 +24,7 @@ Drive::Drive() :
     min_position_(-MathUtils::PI),  // -PI
     max_position_(MathUtils::PI),   // PI
     enabled_(false),
-    direction_(false),
+    direction_(DIRECTION_NEGATIVE),
     step_interval_(0),
     last_step_time_(0),
     steps_remaining_(0),
@@ -70,8 +70,8 @@ bool Drive::init(const Config& config, uint8_t drive_id) {
   disable();
 
   // Устанавливаем направление по умолчанию
-  SET_PIN(config_.dir_pin, LOW);
-  SET_PIN(config_.step_pin, LOW);
+  setDirectionPin(direction_);
+  setStepPin(false);
 
   Logger::info("Drive %d initialized", drive_id_);
   return true;
@@ -141,7 +141,7 @@ void Drive::update(uint32_t delta_time_ms) {
 void Drive::enable() {
   if (enabled_) return;
 
-  //  SET_PIN(config_.enable_pin, LOW);
+  setEnablePin(true);
   enabled_ = true;
   //  Logger::debug("Drive %d: Enabled", drive_id_);
   Logger::debug("Drive %d: Doesn't needs to be enabled", drive_id_);
@@ -150,12 +150,12 @@ void Drive::enable() {
 void Drive::disable() {
   if (!enabled_) return;
 
-  //  SET_PIN(config_.enable_pin, HIGH);
+  setEnablePin(false);
   enabled_ = false;
   current_velocity_ = 0;
   state_ = STATE_IDLE;
   //  Logger::debug("Drive %d: Disabled", drive_id_);
-  Logger::debug("Drive %d: Doesn't needs to be enabled", drive_id_);
+  Logger::debug("Drive %d: Doesn't needs to be disabled", drive_id_);
 }
 
 void Drive::setMode(Mode mode) {
@@ -209,8 +209,8 @@ bool Drive::moveToPosition(float position_rad, float velocity) {
   );
 
   // Устанавливаем направление
-  direction_ = (distance >= 0);
-  SET_PIN(config_.dir_pin, direction_ ^ config_.invert_direction);
+  direction_ = (distance >= 0) ? DIRECTION_POSITIVE : DIRECTION_NEGATIVE;
+  setDirectionPin(direction_);
 
   // Сбрасываем счетчики шагов
   steps_remaining_ = radiansToSteps(fabs(distance));
@@ -232,8 +232,8 @@ bool Drive::setVelocity(float velocity_rad_s) {
   motion_params_.target_velocity = velocity_rad_s;
   current_velocity_ = velocity_rad_s;
 
-  direction_ = (velocity_rad_s >= 0);
-  SET_PIN(config_.dir_pin, direction_ ^ config_.invert_direction);
+  direction_ = (velocity_rad_s >= 0) ? DIRECTION_POSITIVE : DIRECTION_NEGATIVE;
+  setDirectionPin(direction_);
 
   if (fabs(velocity_rad_s) > 0.001f) {
     step_interval_ = calculateStepInterval(fabs(velocity_rad_s));
@@ -262,18 +262,17 @@ bool Drive::startHoming() {
   float homing_velocity = (config_.homing_velocity > 0) ? config_.homing_velocity : config_.max_velocity * 0.3f;
 
   switch (config_.homing_direction) {
-    case HOMING_POSITIVE:
-      direction_ = true;
+    case DIRECTION_POSITIVE:
       motion_params_.target_velocity = homing_velocity;
       break;
 
-    case HOMING_NEGATIVE:
-      direction_ = false;
+    case DIRECTION_NEGATIVE:
       motion_params_.target_velocity = -homing_velocity;
       break;
   }
 
-  SET_PIN(config_.dir_pin, direction_ ^ config_.invert_direction);
+  direction_ = config_.homing_direction;
+  setDirectionPin(direction_);
   step_interval_ = calculateStepInterval(fabs(homing_velocity));
 
   Logger::info("Drive %d: Homing started", drive_id_);
@@ -374,12 +373,12 @@ void Drive::updateStepGenerator() {
 }
 
 void Drive::generateStep() {
-  SET_PIN(config_.step_pin, HIGH);
+  setStepPin(true);
   delayMicroseconds(DRIVER_STEP_TIME_MCS);
-  SET_PIN(config_.step_pin, LOW);
+  setStepPin(false);
 
   steps_remaining_--;
-  float step_size = stepsToRadians(1) * (direction_ ? 1.0f : -1.0f);
+  float step_size = stepsToRadians(1) * ((direction_ == DIRECTION_POSITIVE) ? 1.0f : -1.0f);
   current_position_ += step_size;
   target_position_ = motion_params_.target_position;
 }
@@ -444,7 +443,7 @@ void Drive::updateVelocityProfile() {
   if (current_velocity < 0.001f) current_velocity = 0.001f;
 
   step_interval_ = calculateStepInterval(current_velocity);
-  current_velocity_ = current_velocity * (direction_ ? 1.0f : -1.0f);
+  current_velocity_ = current_velocity * ((direction_ == DIRECTION_POSITIVE) ? 1.0f : -1.0f);
 }
 
 float Drive::stepsToRadians(int32_t steps) const {
@@ -480,6 +479,22 @@ bool Drive::checkAcceleration(float acceleration) const {
   return (acceleration >= 0 && acceleration <= config_.max_acceleration);
 }
 
+void Drive::setStepPin(bool high) const {
+  SET_PIN(config_.step_pin, high ? HIGH : LOW);
+  Logger::controls(Logger::EMULATOR_CMD_STEP, drive_id_, high);
+}
+
+void Drive::setEnablePin(bool enable) const {
+//  SET_PIN(config_.enable_pin, enable ? LOW : HIGH);
+  Logger::controls(Logger::EMULATOR_CMD_ENABLE, drive_id_, enable);
+}
+
+void Drive::setDirectionPin(DriveDirection direction) const {
+  const bool val = ((direction == DIRECTION_POSITIVE)  ^ config_.invert_direction) ? HIGH : LOW;
+  SET_PIN(config_.step_pin, val);
+  Logger::controls(Logger::EMULATOR_CMD_DIR, drive_id_, val);
+}
+
 bool Drive::readLimitSwitch() const {
   if (!config_.limit_switch_pin) return false;
   return (READ_PIN(config_.limit_switch_pin) == LOW);
@@ -512,7 +527,7 @@ void Drive::emergencyStop() {
   current_velocity_ = 0;
   state_ = STATE_IDLE;
   is_homing_ = false;
-  SET_PIN(config_.step_pin, LOW);
+  setStepPin(false);
   Logger::warning("Drive %d: Emergency stop", drive_id_);
 }
 

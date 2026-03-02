@@ -152,19 +152,20 @@ void EmergencySystem::checkDriverFaults() {
   }
 }
 
+// TODO: сделать
 // Проверка напряжения
 void EmergencySystem::checkVoltage() {
-  supply_voltage_ = readAnalogVoltage(Pins::Analog::VOLTAGE_12V);
-
-  if (supply_voltage_ < VOLTAGE_MIN && !hasError(UNDERVOLTAGE)) {
-    Logger::error("Undervoltage detected: %.1fV", supply_voltage_);
-    triggerEmergency(UNDERVOLTAGE);
-  }
-
-  if (supply_voltage_ > VOLTAGE_MAX && !hasError(OVERVOLTAGE)) {
-    Logger::error("Overvoltage detected: %.1fV", supply_voltage_);
-    triggerEmergency(OVERVOLTAGE);
-  }
+//  supply_voltage_ = readAnalogVoltage(Pins::Analog::VOLTAGE_12V);
+//
+//  if (supply_voltage_ < VOLTAGE_MIN && !hasError(UNDERVOLTAGE)) {
+//    Logger::error("Undervoltage detected: %.1fV", supply_voltage_);
+//    triggerEmergency(UNDERVOLTAGE);
+//  }
+//
+//  if (supply_voltage_ > VOLTAGE_MAX && !hasError(OVERVOLTAGE)) {
+//    Logger::error("Overvoltage detected: %.1fV", supply_voltage_);
+//    triggerEmergency(OVERVOLTAGE);
+//  }
 }
 
 // Проверка температуры

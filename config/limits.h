@@ -40,7 +40,7 @@ namespace Limits {
     // Максимальное ускорении при homing (мм/с)
     float homing_acceleration = 30.0f;
     // Направление homing
-    Drive::HomingDirection homing_direction = Drive::HOMING_POSITIVE;
+    Drive::DriveDirection homing_direction = Drive::DIRECTION_POSITIVE;
 
     // Максимальный момент (рывок) (мм/с³)
     float max_jerk = 5000.0f;  // TODO: использовать
