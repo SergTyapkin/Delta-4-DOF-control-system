@@ -85,15 +85,6 @@ public:
            abs(y - v.y) < tolerance &&
            abs(z - v.z) < tolerance;
   }
-
-  // Ограничение значений
-  Vector3 clamp(float min_val, float max_val) const {
-    return Vector3(
-        (x < min_val) ? min_val : (x > max_val ? max_val : x),
-        (y < min_val) ? min_val : (y > max_val ? max_val : y),
-        (z < min_val) ? min_val : (z > max_val ? max_val : z)
-    );
-  }
 };
 
 // Умножение скаляра на вектор

@@ -2,7 +2,7 @@
 #include "../../src/utils/Logger.h"
 #include "../../src/utils/MathUtils.h"
 
-UI::UI() :
+UserInterface::UserInterface() :
     robot_core_(nullptr),
     mode_(Mode::INTERACTIVE),
     is_initialized_(false),
@@ -14,7 +14,7 @@ UI::UI() :
     new_input_available_(false) {
 }
 
-void UI::init(Core* robot_core, const Config& config) {
+void UserInterface::init(Core* robot_core, const Config& config) {
   if (!robot_core) {
     Logger::error("UI: Robot core is null");
     return;
@@ -39,7 +39,7 @@ void UI::init(Core* robot_core, const Config& config) {
   printHelp();
 }
 
-void UI::update() {
+void UserInterface::update() {
   if (!is_initialized_) return;
 
   uint32_t current_time = millis();
@@ -53,7 +53,7 @@ void UI::update() {
   }
 }
 
-void UI::processInput(const String& input) {
+void UserInterface::processInput(const String& input) {
   if (!is_initialized_ || input.length() == 0) {
     return;
   }
@@ -96,7 +96,7 @@ void UI::processInput(const String& input) {
   }
 }
 
-void UI::processInput(const char* input, size_t length) {
+void UserInterface::processInput(const char* input, size_t length) {
   if (length == 0) return;
 
   String input_str = String(input);
@@ -107,7 +107,7 @@ void UI::processInput(const char* input, size_t length) {
   }
 }
 
-void UI::sendState(const RobotState& state) {
+void UserInterface::sendState(const RobotState& state) {
   if (state_subscription_) {
     state_subscription_(state);
   }
@@ -118,16 +118,16 @@ void UI::sendState(const RobotState& state) {
   }
 }
 
-void UI::sendMessage(const String& message, bool is_error) {
+void UserInterface::sendMessage(const String& message, bool is_error) {
   if (is_error) {
     Serial.print("[ERROR] ");
   } else {
     Serial.print("[INFO] ");
   }
-  Serial.println(message);
+//  Serial.println(message);
 }
 
-void UI::sendResponse(const String& command, bool success, const String& message) {
+void UserInterface::sendResponse(const String& command, bool success, const String& message) {
   Serial.print("[");
   Serial.print(command);
   Serial.print("] ");
@@ -146,7 +146,7 @@ void UI::sendResponse(const String& command, bool success, const String& message
   Serial.println();
 }
 
-void UI::setMode(Mode mode) {
+void UserInterface::setMode(Mode mode) {
   if (mode_ == mode) return;
 
   mode_ = mode;
@@ -163,8 +163,8 @@ void UI::setMode(Mode mode) {
   sendMessage("Mode changed to " + mode_str);
 }
 
-void UI::registerCommand(const char* name, const char* description,
-                         bool (*handler)(UI* ui, const String& args),
+void UserInterface::registerCommand(const char* name, const char* description,
+                         bool (*handler)(UserInterface* UI, const String& args),
                          UICommand::Type type) {
   if (command_count_ >= MAX_COMMANDS) {
     Logger::error("UI: Too many commands");
@@ -182,15 +182,15 @@ void UI::registerCommand(const char* name, const char* description,
   Logger::debug("Command registered: %s", name);
 }
 
-void UI::subscribeToState(StateCallback callback) {
+void UserInterface::subscribeToState(StateCallback callback) {
   state_subscription_ = callback;
 }
 
-void UI::unsubscribeFromState() {
+void UserInterface::unsubscribeFromState() {
   state_subscription_ = nullptr;
 }
 
-void UI::printHelp() {
+void UserInterface::printHelp() {
   Serial.println("=== Delta Robot Control System ===");
   Serial.println("Available commands:");
   Serial.println("  help                    - Show this help");
@@ -213,7 +213,7 @@ void UI::printHelp() {
   Serial.println("  teach 0 0 -400          - Teach home position");
 }
 
-void UI::printStatus() {
+void UserInterface::printStatus() {
   Serial.println("=== UI Status ===");
 
   String mode_str;
@@ -235,7 +235,7 @@ void UI::printStatus() {
   Serial.println(errors_count_);
 }
 
-void UI::listCommands() {
+void UserInterface::listCommands() {
   Serial.println("=== Registered Commands ===");
 
   for (int i = 0; i < command_count_; i++) {
@@ -249,23 +249,23 @@ void UI::listCommands() {
   Serial.println(command_count_);
 }
 
-void UI::setupDefaultCommands() {
+void UserInterface::setupDefaultCommands() {
   // Регистрация команд по умолчанию
   registerCommand("HELP", "Show help", handleHelpStaticWrapper, UICommand::SYSTEM);
-  registerCommand("MOVE", "Move to point X Y Z [VELOCITY]", handleMoveStaticWrapper, UICommand::MOTION);
+  registerCommand("MOVE", "Move to point X Y Z [AX AY AZ] [VELOCITY]", handleMoveStaticWrapper, UICommand::MOTION);
   registerCommand("HOME", "Perform homing", handleHomeStaticWrapper, UICommand::MOTION);
   registerCommand("STOP", "Stop movement", handleStopStaticWrapper, UICommand::MOTION);
   registerCommand("ESTOP", "Emergency stop", handleEmergencyStopStaticWrapper, UICommand::EMERGENCY);
   registerCommand("STATUS", "Show robot status", handleStatusStaticWrapper, UICommand::QUERY);
   registerCommand("CONFIG", "Show configuration", handleConfigStaticWrapper, UICommand::CONFIG);
-  registerCommand("TEACH", "Teach point X Y Z [ID]", handleTeachStaticWrapper, UICommand::PROGRAM);
+  registerCommand("TEACH", "Teach point X Y Z [AX AY AZ] [ID]", handleTeachStaticWrapper, UICommand::PROGRAM);
   registerCommand("RUN", "Run program [NAME]", handleRunStaticWrapper, UICommand::PROGRAM);
   registerCommand("RESET", "Reset errors", handleResetStaticWrapper, UICommand::SYSTEM);
   registerCommand("LIST", "List all commands", handleListStaticWrapper, UICommand::SYSTEM);
   registerCommand("MODE", "Set UI mode [MODE]", handleModeStaticWrapper, UICommand::SYSTEM);
 }
 
-bool UI::executeCommand(const String& command, const String& args) {
+bool UserInterface::executeCommand(const String& command, const String& args) {
   for (int i = 0; i < command_count_; i++) {
     if (command == commands_[i].name) {
       return commands_[i].handler(this, args);
@@ -274,7 +274,7 @@ bool UI::executeCommand(const String& command, const String& args) {
   return false;
 }
 
-void UI::processSerialInput() {
+void UserInterface::processSerialInput() {
   while (Serial.available() > 0) {
     char c = Serial.read();
 
@@ -302,27 +302,29 @@ void UI::processSerialInput() {
   }
 }
 
-bool UI::handleHelp(const String& args) {
+bool UserInterface::handleHelp(const String& args) {
   printHelp();
   return true;
 }
 
-bool UI::handleMove(const String& args) {
+bool UserInterface::handleMove(const String& args) {
   if (!robot_core_->isReady()) {
     sendResponse("MOVE", false, "Robot not ready");
     return false;
   }
 
-  Vector3 point(0, 0, 0);
+  Vector6 position(0, 0, 0, 0, 0, 0);
   float velocity = 0;
 
   char* token = strtok((char*)args.c_str(), " ");
   int count = 0;
 
-  while (token != nullptr && count < 4) {
+  while (token != nullptr && count < 7) {
     float val = atof(token);
     if (count < 3) {
-      (&point.x)[count] = val;
+      (&position.x)[count] = val;
+    } else if (count < 6) {
+      (&position.ax)[count - 3] = val * MathUtils::DEG_TO_RAD;
     } else {
       velocity = val;
     }
@@ -335,46 +337,48 @@ bool UI::handleMove(const String& args) {
     return false;
   }
 
-  bool success = robot_core_->moveToPoint(point, velocity);
+  bool success = robot_core_->moveToPosition(position, velocity);
   sendResponse("MOVE", success, success ? "Movement started" : "Failed to start movement");
   return success;
 }
 
-bool UI::handleHome(const String& args) {
+bool UserInterface::handleHome(const String& args) {
   bool success = robot_core_->performHoming();
   sendResponse("HOME", success, success ? "Homing started" : "Failed to start homing");
   return success;
 }
 
-bool UI::handleStop(const String& args) {
+bool UserInterface::handleStop(const String& args) {
   robot_core_->stop();
   sendResponse("STOP", true, "Stopped");
   return true;
 }
 
-bool UI::handleStatus(const String& args) {
+bool UserInterface::handleStatus(const String& args) {
   RobotState state = robot_core_->getState();
   state.print();
   return true;
 }
 
-bool UI::handleConfig(const String& args) {
+bool UserInterface::handleConfig(const String& args) {
   robot_core_->printStatus();
   robot_core_->printKinematicsInfo();
   return true;
 }
 
-bool UI::handleTeach(const String& args) {
-  Vector3 point(0, 0, 0);
+bool UserInterface::handleTeach(const String& args) {
+  Vector6 position(0, 0, 0, 0, 0, 0);
   uint32_t point_id = 0;
 
   char* token = strtok((char*)args.c_str(), " ");
   int count = 0;
 
-  while (token != nullptr && count < 4) {
+  while (token != nullptr && count < 7) {
     float val = atof(token);
     if (count < 3) {
-      (&point.x)[count] = val;
+      (&position.x)[count] = val;
+    } else if (count < 6) {
+      (&position.ax)[count - 3] = val * MathUtils::DEG_TO_RAD;
     } else {
       point_id = atoi(token);
     }
@@ -387,34 +391,34 @@ bool UI::handleTeach(const String& args) {
     return false;
   }
 
-  bool success = robot_core_->teachPoint(point, point_id);
+  bool success = robot_core_->teachPosition(position, point_id);
   sendResponse("TEACH", success, success ? "Point taught" : "Failed to teach point");
   return success;
 }
 
-bool UI::handleRun(const String& args) {
+bool UserInterface::handleRun(const String& args) {
   sendResponse("RUN", false, "Not implemented yet");
   return false;
 }
 
-bool UI::handleEmergencyStop(const String& args) {
+bool UserInterface::handleEmergencyStop(const String& args) {
   robot_core_->emergencyStop();
   sendResponse("ESTOP", true, "Emergency stop activated");
   return true;
 }
 
-bool UI::handleReset(const String& args) {
+bool UserInterface::handleReset(const String& args) {
   bool success = robot_core_->reset();
   sendResponse("RESET", success, success ? "Reset successful" : "Reset failed");
   return success;
 }
 
-bool UI::handleList(const String& args) {
+bool UserInterface::handleList(const String& args) {
   listCommands();
   return true;
 }
 
-bool UI::handleMode(const String& args) {
+bool UserInterface::handleMode(const String& args) {
   if (args.length() == 0) {
     // Показать текущий режим
     String mode_str;
@@ -453,21 +457,21 @@ bool UI::handleMode(const String& args) {
 }
 
 // Статические обертки для передачи команд в регистрацию команд
-bool UI::handleHelpStaticWrapper(UI* ui, const String& args) {return ui->handleHelp(args);}
-bool UI::handleMoveStaticWrapper(UI* ui, const String& args) {return ui->handleMove(args);}
-bool UI::handleHomeStaticWrapper(UI* ui, const String& args) {return ui->handleHome(args);}
-bool UI::handleStopStaticWrapper(UI* ui, const String& args) {return ui->handleStop(args);}
-bool UI::handleStatusStaticWrapper(UI* ui, const String& args) {return ui->handleStatus(args);}
-bool UI::handleConfigStaticWrapper(UI* ui, const String& args) {return ui->handleConfig(args);}
-bool UI::handleTeachStaticWrapper(UI* ui, const String& args) {return ui->handleTeach(args);}
-bool UI::handleRunStaticWrapper(UI* ui, const String& args) {return ui->handleRun(args);}
-bool UI::handleEmergencyStopStaticWrapper(UI* ui, const String& args) {return ui->handleEmergencyStop(args);}
-bool UI::handleResetStaticWrapper(UI* ui, const String& args) {return ui->handleReset(args);}
-bool UI::handleListStaticWrapper(UI* ui, const String& args) {return ui->handleList(args);}
-bool UI::handleModeStaticWrapper(UI* ui, const String& args) {return ui->handleMode(args);}
+bool UserInterface::handleHelpStaticWrapper(UserInterface* UI, const String& args) {return UI->handleHelp(args);}
+bool UserInterface::handleMoveStaticWrapper(UserInterface* UI, const String& args) {return UI->handleMove(args);}
+bool UserInterface::handleHomeStaticWrapper(UserInterface* UI, const String& args) {return UI->handleHome(args);}
+bool UserInterface::handleStopStaticWrapper(UserInterface* UI, const String& args) {return UI->handleStop(args);}
+bool UserInterface::handleStatusStaticWrapper(UserInterface* UI, const String& args) {return UI->handleStatus(args);}
+bool UserInterface::handleConfigStaticWrapper(UserInterface* UI, const String& args) {return UI->handleConfig(args);}
+bool UserInterface::handleTeachStaticWrapper(UserInterface* UI, const String& args) {return UI->handleTeach(args);}
+bool UserInterface::handleRunStaticWrapper(UserInterface* UI, const String& args) {return UI->handleRun(args);}
+bool UserInterface::handleEmergencyStopStaticWrapper(UserInterface* UI, const String& args) {return UI->handleEmergencyStop(args);}
+bool UserInterface::handleResetStaticWrapper(UserInterface* UI, const String& args) {return UI->handleReset(args);}
+bool UserInterface::handleListStaticWrapper(UserInterface* UI, const String& args) {return UI->handleList(args);}
+bool UserInterface::handleModeStaticWrapper(UserInterface* UI, const String& args) {return UI->handleMode(args);}
 
 
-void UI::printWelcomeMessage() {
+void UserInterface::printWelcomeMessage() {
   Serial.println();
   Serial.println("========================================");
   Serial.println("    DELTA ROBOT CONTROL SYSTEM v1.0");
@@ -475,18 +479,18 @@ void UI::printWelcomeMessage() {
   Serial.println();
 }
 
-void UI::printPrompt() {
+void UserInterface::printPrompt() {
   if (mode_ == Mode::INTERACTIVE) {
     Serial.print("> ");
     Serial.flush();
   }
 }
 
-void UI::onStateUpdate(const RobotState& state) {
+void UserInterface::onStateUpdate(const RobotState& state) {
   sendState(state);
 }
 
-void UI::onCommandComplete(const Core::CommandResult& result) {
+void UserInterface::onCommandComplete(const Core::CommandResult& result) {
   switch (result.status) {
     case Core::STATUS_COMPLETED:
       sendMessage(String("Command ") + result.command_id + " completed", false);
@@ -505,6 +509,6 @@ void UI::onCommandComplete(const Core::CommandResult& result) {
   }
 }
 
-void UI::onError(uint16_t error_code, const String& error_message) {
+void UserInterface::onError(uint16_t error_code, const String& error_message) {
   sendMessage(String("Error ") + error_code + ": " + error_message, true);
 }

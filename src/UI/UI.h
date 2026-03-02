@@ -5,13 +5,13 @@
 #include "../../src/Core/Core.h"
 #include "../../src/utils/CircularBuffer.h"
 
-class UI;
+class UserInterface;
 
 // Замена std::function на указатели для экономии памяти
-typedef bool (*CommandHandler)(UI* ui, const String& args);
+typedef bool (*CommandHandler)(UserInterface* UI, const String& args);
 typedef void (*StateCallback)(const RobotState& state);
 
-class UI {
+class UserInterface {
 public:
   // Конфигурация UI
   struct Config {
@@ -54,7 +54,7 @@ public:
   };
 
   // Конструктор
-  UI();
+  UserInterface();
 
   // Инициализация
   void init(Core* robot_core, const Config& config = Config());
@@ -78,7 +78,7 @@ public:
 
   // Регистрация команд - упрощённая версия
   void registerCommand(const char* name, const char* description,
-                       bool (*handler)(UI* ui, const String& args),
+                       bool (*handler)(UserInterface* UI, const String& args),
                        UICommand::Type type);
 
   // Управление подписками
@@ -144,18 +144,18 @@ private:
   bool handleMode(const String& args);
 
   // Статические обертки для передачи команд в регистрацию команд
-  static bool handleHelpStaticWrapper(UI* ui, const String& args);
-  static bool handleMoveStaticWrapper(UI* ui, const String& args);
-  static bool handleHomeStaticWrapper(UI* ui, const String& args);
-  static bool handleStopStaticWrapper(UI* ui, const String& args);
-  static bool handleStatusStaticWrapper(UI* ui, const String& args);
-  static bool handleConfigStaticWrapper(UI* ui, const String& args);
-  static bool handleTeachStaticWrapper(UI* ui, const String& args);
-  static bool handleRunStaticWrapper(UI* ui, const String& args);
-  static bool handleEmergencyStopStaticWrapper(UI* ui, const String& args);
-  static bool handleResetStaticWrapper(UI* ui, const String& args);
-  static bool handleListStaticWrapper(UI* ui, const String& args);
-  static bool handleModeStaticWrapper(UI* ui, const String& args);
+  static bool handleHelpStaticWrapper(UserInterface* UI, const String& args);
+  static bool handleMoveStaticWrapper(UserInterface* UI, const String& args);
+  static bool handleHomeStaticWrapper(UserInterface* UI, const String& args);
+  static bool handleStopStaticWrapper(UserInterface* UI, const String& args);
+  static bool handleStatusStaticWrapper(UserInterface* UI, const String& args);
+  static bool handleConfigStaticWrapper(UserInterface* UI, const String& args);
+  static bool handleTeachStaticWrapper(UserInterface* UI, const String& args);
+  static bool handleRunStaticWrapper(UserInterface* UI, const String& args);
+  static bool handleEmergencyStopStaticWrapper(UserInterface* UI, const String& args);
+  static bool handleResetStaticWrapper(UserInterface* UI, const String& args);
+  static bool handleListStaticWrapper(UserInterface* UI, const String& args);
+  static bool handleModeStaticWrapper(UserInterface* UI, const String& args);
 
   // Вспомогательные методы
   static void printWelcomeMessage();

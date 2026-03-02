@@ -2,6 +2,7 @@
 
 #include <Arduino.h>  // вместо <cstdint>
 #include "../../config/pins_config.h"
+#include "../../config/robot_params.h"
 
 class EmergencySystem {
 public:
@@ -12,15 +13,15 @@ public:
     LIMIT_SWITCH_1     = 0x0011,  // Сработал концевик 1
     LIMIT_SWITCH_2     = 0x0012,  // Сработал концевик 2
     LIMIT_SWITCH_3     = 0x0013,  // Сработал концевик 3
-    LIMIT_SWITCH_4     = 0x0014,  // Сработал концевик 3
+    LIMIT_SWITCH_4     = 0x0014,  // Сработал концевик 4
     DRIVER_FAULT_1     = 0x0021,  // Ошибка драйвера 1
     DRIVER_FAULT_2     = 0x0022,  // Ошибка драйвера 2
     DRIVER_FAULT_3     = 0x0023,  // Ошибка драйвера 3
-    DRIVER_FAULT_4     = 0x0024,  // Ошибка драйвера 3
+    DRIVER_FAULT_4     = 0x0024,  // Ошибка драйвера 4
     OVERCURRENT_1      = 0x0031,  // Перегруз по току 1
     OVERCURRENT_2      = 0x0032,  // Перегруз по току 2
     OVERCURRENT_3      = 0x0033,  // Перегруз по току 3
-    OVERCURRENT_4      = 0x0034,  // Перегруз по току 3
+    OVERCURRENT_4      = 0x0034,  // Перегруз по току 4
     OVERTEMPERATURE    = 0x0400,  // Перегрев
     UNDERVOLTAGE       = 0x0800,  // Низкое напряжение
     OVERVOLTAGE        = 0x1000,  // Высокое напряжение
@@ -80,10 +81,10 @@ public:
 private:
   // Состояние системы
   State state_ = NORMAL;
-  uint16_t error_code_ = NONE;  // простой uint16_t вместо enum class
+  uint16_t error_code_ = NONE;
 
-  // Конфигурация концевиков (упрощаем - убираем normally_open если не используется)
-  LimitSwitchConfig limit_switches_[3];
+  // Конфигурация концевиков
+  LimitSwitchConfig limit_switches_[RobotParams::MOTORS_COUNT];
 
   // Пользовательский callback
   EmergencyCallback emergency_callback_ = nullptr;

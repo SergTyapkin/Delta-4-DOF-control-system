@@ -4,8 +4,8 @@
 
 RobotState::RobotState() :
     status(STATUS_IDLE),
-    effector_position(0, 0, 0),
-    target_position(0, 0, 0),
+    effector_position(0, 0, 0, 0, 0, 0),
+    target_position(0, 0, 0, 0, 0, 0),
     current_velocity(0),
     target_velocity(0),
     movement_progress(0),

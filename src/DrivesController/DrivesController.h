@@ -4,6 +4,7 @@
 #include "Drive.h"
 #include "../../src/utils/CircularBuffer.h"
 #include "../../config/robot_params.h"
+#include "../../config/limits.h"
 
 class DrivesController {
 public:
@@ -16,8 +17,8 @@ public:
     bool stop_on_single_error;     // Останавливать все при ошибке одного
 
     Config() :
-        sync_tolerance(0.01f),     // ~0.57 градуса
-        sync_timeout(5000),        // 5 секунд
+        sync_tolerance(Limits::TOLERANCE.angular_tolerance),
+        sync_timeout(Limits::TIME.controller_sync_timeout),
         enable_sync_move(true),
         stop_on_single_error(true) {}
   };

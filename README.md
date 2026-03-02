@@ -24,7 +24,7 @@ DeltaRobot/
 │ │ ├── TrajectoryGenerator.h/cpp # Генерация траекторий движения
 │ │ └── Kinematics/ # Кинематика
 │ │   ├── Kinematics.h/cpp # Прямая и обратная задачи кинематики
-│ │   └── DeltaSolver.h/cpp # Решение задач, учитывающее лимиты
+│ │   └── Kinematics.h/cpp # Решение задач, учитывающее лимиты
 │ ├── DrivesController/ # Управление приводами
 │ │ ├── DrivesController.h/cpp
 │ │ ├── Drive.h/cpp # Управление одним приводом
@@ -38,13 +38,15 @@ DeltaRobot/
 │ │ └── EmergencySystem.h/cpp
 │ └── utils/ # Вспомогательные утилиты
 │   ├── Vector3.h
-│   ├── CircularBuffer.h # Асинхронный буфер хранения команд
+│   ├── Vector6.h
+│   ├── Matrix.h
 │   ├── Utils.h
 │   ├── MathUtils.h
 │   └── Logger.h
 └── config/ # Конфигурационные файлы
   ├── pins_config.h # Конфигурация пинов
   ├── robot_params.h # Параметры робота
+  ├── system.h # Системные настройки
   └── limits.h # Пределы движения
 ```
 
@@ -60,7 +62,8 @@ DeltaRobot/
 
 3. **Утилиты:**
    - `src/utils/Vector3.h` - 3D вектор
-   - `src/utils/CircularBuffer.h` - кольцевой буфер команд
+   - `src/utils/Vector6.h` - 6D вектор с углами
+   - `src/utils/Matrix.h` - Матричные вычисления
    - `src/utils/MathUtils.h` - математические функции
    - `src/utils/Utils.h` - Прочие функции
    - `src/utils/Logger.h` - система логирования
@@ -73,7 +76,7 @@ DeltaRobot/
 
 6. **Кинематика:**
    - `src/Core/Kinematics/Kinematics.h/cpp` - решение обратной и прямой задач кинематики
-   - `src/Core/Kinematics/DeltaSolver.h/cpp` - решатель кинематики, учитывающий лимиты
+   - `src/Core/Kinematics/Kinematics.h/cpp` - решатель кинематики, учитывающий лимиты
    
 7. **Ядро системы:**
    - `src/Core/Core.h/cpp` - ядро системы
@@ -137,7 +140,7 @@ DeltaRobot/
 4. Аварийная кнопка остановки
 
 ### Расширение программы
-1. Новые команды: добавьте через `UI::setupDefaultCommands()`
+1. Новые команды: добавьте через `UserInterface::setupDefaultCommands()`
 2. Новые типы траекторий: расширьте `TrajectoryGenerator`
 3. Поддержка новых датчиков: создайте класс датчика в `FeedbackReader`
 
@@ -146,7 +149,7 @@ DeltaRobot/
 Используйте `StateSubscriptionCallback` для отправки данных.
 
 ### Отладка
-Включите режим отладки в UI::Config:
+Включите режим отладки в UserInterface::Config:
 ```C++
 config.debug_mode = true;
 ```

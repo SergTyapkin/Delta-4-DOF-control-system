@@ -3,28 +3,30 @@
 #include <Arduino.h>
 #include "RobotState.h"
 #include "TrajectoryGenerator.h"
-#include "../../src/Core/Kinematics/DeltaSolver.h"
+#include "../../src/Core/Kinematics/Kinematics.h"
 #include "../../src/DrivesController/DrivesController.h"
 #include "../../src/utils/CircularBuffer.h"
 #include "../../config/limits.h"
 #include "../../config/robot_params.h"
+#include "../../config/system.h"
 
 class Core {
 public:
   // Конфигурация ядра
   struct Config {
-    DeltaSolver::DeltaConfig kinematics_config;
+    Kinematics::DeltaConfig kinematics_config;
     DrivesController::Config drives_config;
-    float default_velocity;          // Скорость по умолчанию (мм/с)
-    float default_acceleration;      // Ускорение по умолчанию (мм/с²)
-    float max_jerk;                  // Максимальный рывок (мм/с³)
-    float trajectory_update_rate;    // Частота обновления траектории (Гц)
+    float default_velocity;           // Скорость по умолчанию (мм/с)
+    float default_acceleration;       // Ускорение по умолчанию (мм/с²)
+    float max_jerk;                   // Максимальный рывок (мм/с³)
+    float trajectory_update_interval; // Интервал обновления траектории (мс)
 
     Config() :
-        default_velocity(Limits::VELOCITY.max_linear_velocity * 0.5f),
-        default_acceleration(Limits::VELOCITY.max_linear_acceleration * 0.5f),
-        max_jerk(Limits::VELOCITY.max_jerk),
-        trajectory_update_rate(100.0f) {}
+        default_velocity(Limits::DRIVERS.default_linear_velocity),
+        default_acceleration(Limits::DRIVERS.default_linear_acceleration),
+        max_jerk(Limits::DRIVERS.max_jerk),
+        trajectory_update_interval(System::INTERVAL_UPDATE_TRAJECTORY_MCS) {
+    }
   };
 
   // Режимы работы
@@ -45,6 +47,7 @@ public:
       CMD_MOVE_JOINTS,
       CMD_EXECUTE_TRAJECTORY,
       CMD_TEACH_POINT,
+      CMD_LOAD_POINT,
       CMD_RUN_PROGRAM,
       CMD_STOP,
       CMD_PAUSE,
@@ -55,7 +58,7 @@ public:
     };
 
     Type type;
-    Vector3 target_point;
+    Vector6 target_position;
     float joint_angles[RobotParams::MOTORS_COUNT];
     TrajectoryGenerator::TrajectoryType trajectory_type;
     float velocity;
@@ -65,7 +68,7 @@ public:
 
     Command() :
         type(CMD_STOP),
-        target_point(0, 0, 0),
+        target_position(0, 0, 0, 0, 0, 0),
         trajectory_type(TrajectoryGenerator::TRAJ_LINEAR),
         velocity(0),
         acceleration(0),
@@ -116,16 +119,15 @@ public:
   void clearCommandQueue();
 
   // Управление движением
-  bool moveToPoint(const Vector3& point, float velocity = 0,
+  bool moveToPosition(const Vector6& point, float velocity = 0,
                    TrajectoryGenerator::TrajectoryType traj_type = TrajectoryGenerator::TRAJ_LINEAR);
   bool moveJoints(const float angles[RobotParams::MOTORS_COUNT], float velocity = 0);
-  bool setCartesianVelocity(const Vector3& velocity);
   bool setJointVelocity(const float velocities[RobotParams::MOTORS_COUNT]);
 
   // Homing и калибровка
   bool performHoming();
   bool calibrate();
-  bool setHomePosition(const Vector3& home_point);
+  bool setHomePosition(const Vector6& home_point);
 
   // Управление состоянием
   void stop();
@@ -138,20 +140,21 @@ public:
   Mode getMode() const { return mode_; }
   RobotState getState() const;
   CommandStatus getCommandStatus(uint32_t command_id) const;
-  Vector3 getCurrentPosition() const;
+  Vector6 getCurrentEffectorPosition() const;
   void getCurrentJoints(float angles[RobotParams::MOTORS_COUNT]) const;
   bool isMoving() const;
   bool isHomed() const;
   bool isReady() const;
 
   // Траектории
-  bool startTrajectory(const Vector3& start, const Vector3& end,
+  bool startTrajectory(const Vector6& start, const Vector6& end,
                        TrajectoryGenerator::TrajectoryType type, float velocity);
-  bool addTrajectoryPoint(const Vector3& point);
+  bool addTrajectoryPoint(const Vector6& point);
   bool clearTrajectory();
 
   // Обучение
-  bool teachPoint(const Vector3& point, uint32_t point_id = 0);
+  bool teachPosition(const Vector6& point, uint32_t point_id = 0);
+  bool loadPoint(uint32_t point_id, float velocity);
 
   // Callback'и с контекстом
   typedef void (*StateUpdateCallback)(const RobotState&, void*);
@@ -174,7 +177,7 @@ private:
   Config config_;
 
   // Компоненты
-  DeltaSolver kinematics_;
+  Kinematics kinematics_;
   DrivesController drives_controller_;
   RobotState robot_state_;
   TrajectoryGenerator trajectory_generator_;
@@ -199,19 +202,23 @@ private:
 
   // Траектории
   static const uint8_t MAX_TRAJECTORY_POINTS = 32;
-  Vector3 trajectory_points_[MAX_TRAJECTORY_POINTS];
-  uint8_t trajectory_points_count_;
-  uint32_t current_trajectory_point_;
+  Vector6 trajectory_positions_[MAX_TRAJECTORY_POINTS];
+  uint8_t trajectory_positions_count_;
+  uint32_t current_trajectory_position_;
   bool trajectory_in_progress_;
 
+  // Переменные для контроля времени
+  uint32_t last_update_time_;
+  uint32_t last_state_update_time_;
+
   // Обучение
-  struct TeachPoint {
+  struct TeachPosition {
     uint32_t id;
-    Vector3 point;
+    Vector6 position;
   };
   static const uint8_t MAX_TEACH_POINTS = 20;
-  TeachPoint teach_points_[MAX_TEACH_POINTS];
-  uint8_t teach_points_count_;
+  TeachPosition teach_positions_[MAX_TEACH_POINTS];
+  uint8_t teach_positions_count_;
 
   // Callback'и
   StateUpdateCallback state_update_callback_;
@@ -236,7 +243,8 @@ private:
   bool handleMoveToPoint(const Command& cmd);
   bool handleMoveJoints(const Command& cmd);
   bool handleExecuteTrajectory(const Command& cmd);
-  bool handleTeachPoint(const Command& cmd);
+  bool handleTeachPosition(const Command& cmd);
+  bool handleLoadPoint(const Command& cmd);
   bool handleStop(const Command& cmd);
   bool handlePause(const Command& cmd);
   bool handleResume(const Command& cmd);
@@ -245,9 +253,9 @@ private:
   bool handleCalibrate(const Command& cmd);
 
   // Вспомогательные методы
-  bool convertToJointAngles(const Vector3& point, float angles[RobotParams::MOTORS_COUNT]);
-  bool checkPointSafety(const Vector3& point);
-  bool checkJointSafety(const float angles[RobotParams::MOTORS_COUNT]);
+  bool solveJointAnglesForPosition(const Vector6& point, float joint_positions_z[RobotParams::MOTORS_COUNT]);
+  bool checkPositionSafety(const Vector6& point);
+  bool checkJointsPositionsZSafety(const float angles[RobotParams::MOTORS_COUNT]);
   void logCommand(const Command& cmd, CommandStatus status,
                   uint16_t error_code = 0, const char* error_msg = "");
 
@@ -256,9 +264,4 @@ private:
                            Drive::State new_state);
   void onDrivesHomingComplete(bool success);
   void onDrivesCommandComplete(uint32_t commands_executed);
-
-  // Переменные для контроля времени
-  uint32_t last_update_time_;
-  uint32_t last_state_update_time_;
-  uint32_t trajectory_update_interval_;
 };

@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include "../../src/utils/Vector3.h"
+#include "../../src/utils/Vector6.h"
 #include "../../config/limits.h"
 
 class TrajectoryGenerator {
@@ -22,13 +23,13 @@ public:
   void setMaxJerk(float jerk) { max_jerk_ = jerk; }
 
   // Генерация траектории
-  bool generate(const Vector3& start, const Vector3& end);
-  bool generate(const Vector3 points[], uint8_t num_points);
-  bool generateCircle(const Vector3& center, float radius,
-                      const Vector3& normal, float start_angle, float end_angle);
+  bool generate(const Vector6& start, const Vector6& end);
+  bool generate(const Vector6 positions[], uint8_t num_points);
+  bool generateArc(const Vector3& center, float radius,
+                   const Vector3& normal, float start_angle, float end_angle);
 
   // Получение следующей точки
-  bool getNextPoint(Vector3& point, uint32_t dt_ms);
+  bool getNextPoint(Vector6& position, uint32_t dt_ms);
 
   // Управление
   void start();
@@ -62,12 +63,12 @@ private:
 
   // Текущая траектория
   static const uint8_t MAX_TRAJECTORY_POINTS = 32;
-  Vector3 trajectory_points_[MAX_TRAJECTORY_POINTS];
-  uint8_t trajectory_point_count_;
+  Vector6 trajectory_positions_[MAX_TRAJECTORY_POINTS];
+  uint8_t trajectory_positions_count_;
   uint8_t current_segment_;
 
-  Vector3 start_point_;
-  Vector3 end_point_;
+  Vector6 start_position_;
+  Vector6 end_position_;
   Vector3 center_point_;
   Vector3 normal_vector_;
   float radius_;
@@ -91,17 +92,17 @@ private:
   VelocityProfile current_profile_;
 
   // Приватные методы
-  void generateLinearTrajectory(const Vector3& start, const Vector3& end);
-  void generateSplineTrajectory(const Vector3 points[], uint8_t num_points);
-  void generateCircularTrajectory(const Vector3& center, float radius,
-                                  const Vector3& normal, float start_angle, float end_angle);
+  void generateLinearTrajectory(const Vector6& start, const Vector6& end);
+  void generateSplineTrajectory(const Vector6 positions[], uint8_t num_points);
+  void generateArcTrajectory(const Vector3& center, float radius,
+                             const Vector3& normal, float start_angle, float end_angle);
   void calculateVelocityProfile(float distance);
 
-  Vector3 interpolateLinear(float t) const;
-  Vector3 interpolateSpline(float t) const;
-  Vector3 interpolateCircular(float t) const;
-  Vector3 calculateSplinePoint(float t, const Vector3& p0, const Vector3& p1,
-                               const Vector3& p2, const Vector3& p3) const;
+  Vector6 interpolateLinear(float t) const;
+  Vector6 interpolateSpline(float t) const;
+  Vector6 interpolateCircular(float t) const;
+  Vector6 calculateSplinePoint(float t, const Vector6& p0, const Vector6& p1,
+                               const Vector6& p2, const Vector6& p3) const;
 
   // Вспомогательные методы
   float calculateTrajectoryTime(float distance) const;

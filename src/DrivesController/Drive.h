@@ -25,8 +25,7 @@ public:
   // Направление homing
   enum HomingDirection {
     HOMING_POSITIVE,
-    HOMING_NEGATIVE,
-    HOMING_TO_LIMIT
+    HOMING_NEGATIVE
   };
 
   // Конфигурация привода
@@ -40,7 +39,7 @@ public:
 
     // Параметры двигателя
     float steps_per_revolution;
-    float microsteps;
+    float microsteps_per_revolution;
     float gear_ratio;
 
     // Пределы
@@ -64,7 +63,7 @@ public:
         step_pin(0), dir_pin(0),
         //        enable_pin(0),
         limit_switch_pin(0), fault_pin(0),
-        steps_per_revolution(200.0f), microsteps(16.0f), gear_ratio(1.0f),
+        steps_per_revolution(200.0f), microsteps_per_revolution(16.0f), gear_ratio(1.0f),
         max_velocity(10.0f), max_acceleration(50.0f),
         homing_velocity(2.0f), homing_acceleration(10.0f),
         homing_direction(HOMING_NEGATIVE),

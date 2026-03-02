@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
-#include "../../src/utils/Vector3.h"
+#include "../../src/utils/Vector6.h"
 #include "../../config/robot_params.h"
 
 struct RobotState {
@@ -19,15 +19,15 @@ struct RobotState {
   // Текущий статус
   Status status;
 
-  // Позиция эффектора (мм)
-  Vector3 effector_position;
+  // Позиция и наклон эффектора
+  Vector6 effector_position;
 
   // Позиции и скорости шарниров (радианы, рад/с)
   float joint_positions[RobotParams::MOTORS_COUNT];
   float joint_velocities[RobotParams::MOTORS_COUNT];
 
   // Целевые значения
-  Vector3 target_position;
+  Vector6 target_position;
 
   // Информация о движении
   float current_velocity;     // Текущая скорость (мм/с)

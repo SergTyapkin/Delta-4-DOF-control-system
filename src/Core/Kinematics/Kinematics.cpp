@@ -1,169 +1,160 @@
 #include <Arduino.h>
 #include "Kinematics.h"
 #include "../../../src/utils/Logger.h"
+#include "../../../src/utils/MathUtils.h"
+#include "../../../src/utils/Matrix.h"
 
 Kinematics::Kinematics() {
   // Конструктор по умолчанию
 }
 
-void Kinematics::init(const DeltaSolver::DeltaConfig& config) {
-  solver_.init(config);
-  Logger::info("Kinematics initialized");
-}
-
-bool Kinematics::forward(const float angles[RobotParams::MOTORS_COUNT], Vector3& position) {
-  return solver_.forwardKinematics(angles, position);
-}
-
-Kinematics::Result Kinematics::inverse(const Vector3& position) {
-  Result result;
-  DeltaSolver::Solution solution = solver_.inverseKinematics(position);
-
-  result.valid = solution.valid;
-  if (result.valid) {
-    result.joint_angles[0] = solution.angles[0];
-    result.joint_angles[1] = solution.angles[1];
-    result.joint_angles[2] = solution.angles[2];
-    result.joint_angles[3] = solution.angles[3];
-  } else {
-    result.error_code = solution.error_code;
-    snprintf(result.error_message, sizeof(result.error_message),
-             "IK failed: %s", solution.error_message);
+void Kinematics::init(const Kinematics::DeltaConfig& config) {
+  if (!config.isValid()) {
+    Logger::error("Invalid Delta robot configuration");
+    return;
   }
 
-  return result;
+  config_ = config;
+
+  Logger::info("Kinematics initialized:");
+  Logger::info("  Arm length: %.1f mm", config_.arm_length);
+  Logger::info("  Effector height: %.1f mm", config_.effector_height);
+  Logger::info("  Columns joins positions and effector joints positions configured (values omitted)");
 }
 
-Kinematics::Result Kinematics::inverseSafe(const Vector3& position) {
-  Result result;
 
+Kinematics::Solution Kinematics::inverseKinematics(const Vector6& position) {
   // Проверка рабочего пространства
-  if (!checkWorkspaceBounds(position)) {
-    result.valid = false;
-    result.error_code = 3001;
-    snprintf(result.error_message, sizeof(result.error_message),
-             "Point outside workspace");
-    return result;
+  if (!checkWorkspaceBounds(position.toPosition())) {
+    Solution solution;
+    solution.valid = false;
+    solution.error_code = 31;
+    snprintf(solution.error_message, sizeof(solution.error_message), "Point position is outside of the workspace limits");
+    return solution;
+  }
+  // Проверка углов наклона эффектора
+  if (!checkEffectorAnglesBounds(position.toOrientation())) {
+    Solution solution;
+    solution.valid = false;
+    solution.error_code = 32;
+    snprintf(solution.error_message, sizeof(solution.error_message), "Target angles are out of limits");
+    return solution;
   }
 
-  DeltaSolver::Solution solution = solver_.inverseKinematicsSafe(position);
+  Solution solution = solveInverseKinematics(position);
 
-  result.valid = solution.valid;
-  if (result.valid) {
-    result.joint_angles[0] = solution.angles[0];
-    result.joint_angles[1] = solution.angles[1];
-    result.joint_angles[2] = solution.angles[2];
-    result.joint_angles[3] = solution.angles[3];
-
-    // Дополнительная проверка безопасности
-    if (!areAnglesSafe(result.joint_angles)) {
-      result.valid = false;
-      result.error_code = 3002;
-      snprintf(result.error_message, sizeof(result.error_message),
-               "Joint angles not safe");
-    }
-
-    // Проверка на коллизии
-    if (!checkCollisions(position, result.joint_angles)) {
-      result.valid = false;
-      result.error_code = 3003;
-      snprintf(result.error_message, sizeof(result.error_message),
-               "Possible collision detected");
-    }
-  } else {
-    result.error_code = solution.error_code;
-    snprintf(result.error_message, sizeof(result.error_message),
-             "IK failed: %s", solution.error_message);
+  // Проверка валидности решения
+  if (!solution.valid) {
+    return solution;
   }
 
-  return result;
-}
-
-bool Kinematics::isReachable(const Vector3& position) {
-  return solver_.isReachable(position);
-}
-
-bool Kinematics::isSafe(const Vector3& position) const {
-  if (!checkWorkspaceBounds(position)) {
-    return false;
+  // Проверка на коллизии
+  if (!checkCollisions(position, solution.joints_positions_z)) {
+    solution.valid = false;
+    solution.error_code = 33;
+    snprintf(solution.error_message, sizeof(solution.error_message), "Possible collision detected");
+    Logger::warning("Inverse kinematics solve unsafe: possible collision detected");
   }
 
-  Result result = const_cast<Kinematics*>(this)->inverseSafe(position);
-  return result.valid;
-}
+  // Проверка на сингулярности
+  SingularityType singularity = checkSingularity(position, solution.joints_positions_z);
+  if (singularity != SING_NONE) {
+    solution.valid = false;
+    solution.error_code = 40 + singularity;
 
-bool Kinematics::areAnglesSafe(const float angles[RobotParams::MOTORS_COUNT]) const {
-  return checkJointLimits(angles);
-}
-
-bool Kinematics::velocityMapping(
-    const Vector3& position,
-    const Vector3& task_velocity,
-    float joint_velocities[RobotParams::MOTORS_COUNT]
-) {
-  float jacobian[RobotParams::MOTORS_COUNT][3];
-  if (!solver_.computeJacobian(position, jacobian)) {
-    return false;
+    Logger::warning("Inverse kinematics solve unsafe: singularity detected (type %d)", singularity);
   }
 
-  return solver_.taskToJointVelocity(position, task_velocity, joint_velocities);
-}
-
-void Kinematics::getWorkspaceBounds(float& min_radius, float& max_radius,
-                                    float& min_z, float& max_z) const {
-  solver_.getWorkspaceBounds(min_radius, max_radius, min_z, max_z);
-}
-
-bool Kinematics::getJacobian(const Vector3& position, float jacobian[RobotParams::MOTORS_COUNT][3]) {
-  return solver_.computeJacobian(position, jacobian);
-}
-
-float Kinematics::getJacobianDeterminant(const Vector3& position) {
-  float jacobian[RobotParams::MOTORS_COUNT][3];
-  if (!getJacobian(position, jacobian)) {
-    return 0.0f;
-  }
-
-  float det = jacobian[0][0] * (jacobian[1][1] * jacobian[2][2] - jacobian[1][2] * jacobian[2][1]) -
-              jacobian[0][1] * (jacobian[1][0] * jacobian[2][2] - jacobian[1][2] * jacobian[2][0]) +
-              jacobian[0][2] * (jacobian[1][0] * jacobian[2][1] - jacobian[1][1] * jacobian[2][0]);
-
-  return det;
-}
-
-const DeltaSolver::DeltaConfig& Kinematics::getConfig() const {
-  return solver_.getConfig();
-}
-
-bool Kinematics::checkWorkspaceBounds(const Vector3& position) const {
-  return Limits::SafetyCheck::isWorkspacePointSafe(position.x, position.y, position.z);
-}
-
-bool Kinematics::checkJointLimits(const float angles[RobotParams::MOTORS_COUNT]) const {
-  return Limits::SafetyCheck::areJointAnglesSafe(angles);
-}
-
-bool Kinematics::checkCollisions(const Vector3& position,
-                                 const float angles[RobotParams::MOTORS_COUNT]) const {
-  // Упрощенная проверка коллизий
-  if (position.z > -50.0f) {
-    return false;
-  }
-
-  const auto& config = solver_.getConfig();
-
+  // Проверка допустимости смещений по стойке
   for (uint8_t i = 0; i < RobotParams::MOTORS_COUNT; i++) {
-    Vector3 effector_joint = solver_.getEffectorJointPosition(position, i);
-    Vector3 upper_joint = solver_.getUpperJointPosition(angles[i], i);
+    if (!Limits::JOINT_LIMITS[i].isPositionZValid(solution.joints_positions_z[i])) {
+      solution.valid = false;
+      solution.error_code = 32;
+      snprintf(solution.error_message, sizeof(solution.error_message),
+               "Distance %d out of limits: %.3f", i, solution.joints_positions_z[i]);
 
-    float distance = upper_joint.distanceTo(effector_joint);
-    float min_distance = fabs(config.arm_length - config.forearm_length);
-    float max_distance = config.arm_length + config.forearm_length;
+      Logger::warning("Inverse kinematics solve unsafe: joint %d position Z (%.2f mm) out of limits",
+                      i, solution.joints_positions_z[i]);
+      break;
+    }
+  }
 
-    if (distance < min_distance + 5.0f || distance > max_distance - 5.0f) {
+  return solution;
+}
+
+bool Kinematics::forwardKinematics(const float joints_angles[RobotParams::MOTORS_COUNT], Vector6& position) {
+  return solveForwardKinematics(joints_angles, position);
+}
+
+bool Kinematics::computeAnglesJacobian(const Vector6& position, float jacobian[RobotParams::MOTORS_COUNT][3]) {
+  const float DELTA = 0.01f; // (mm)
+
+  Solution base_solution = solveInverseKinematics(position);
+  if (!base_solution.valid) {
+    return false;
+  }
+
+  Vector6 variations[3] = {
+      Vector6(DELTA, 0, 0),
+      Vector6(0, DELTA, 0),
+      Vector6(0, 0, DELTA)
+  };
+
+  for (uint8_t i = 0; i < 3; i++) {
+    Vector6 varied_pos = position + variations[i];
+    Solution varied_solution = solveInverseKinematics(varied_pos);
+
+    if (!varied_solution.valid) {
       return false;
+    }
+
+    for (uint8_t j = 0; j < RobotParams::MOTORS_COUNT; j++) {
+      jacobian[j][i] = (varied_solution.joints_angles[j] - base_solution.joints_angles[j]) / DELTA;
     }
   }
 
   return true;
+}
+
+// TODO: привести метод в порядок. Он не работает
+bool Kinematics::inverseKinematicsVelocity(
+    const Vector6& position,
+    const Vector6& velocity,
+    float joints_velocities[RobotParams::MOTORS_COUNT]
+) {
+  float jacobian[RobotParams::MOTORS_COUNT][3];
+  if (!computeAnglesJacobian(position, jacobian)) {
+    return false;
+  }
+
+  float J_pseudo[3][RobotParams::MOTORS_COUNT];
+  if (!Matrix::pseudoInverseJacobian(jacobian, J_pseudo)) {
+    return false;
+  }
+
+  // Compute: joint_velocity = J_pseudo^T * velocity
+  float J_pseudo_transposed[RobotParams::MOTORS_COUNT][3];
+  Matrix::transposeJacobian(J_pseudo, J_pseudo_transposed);
+  Matrix::multiply(J_pseudo_transposed, velocity.toPosition(), joints_velocities);
+
+  return true;
+}
+
+bool Kinematics::isSolutionPhysical(float joint_position_z) {
+  return !(
+      isnan(joint_position_z) ||
+      isinf(joint_position_z) ||
+      joint_position_z > 0
+  );
+}
+
+const Kinematics::DeltaConfig& Kinematics::getConfig() const {
+  return config_;
+}
+
+bool Kinematics::checkWorkspaceBounds(const Vector3& point) const {
+  return Limits::SafetyCheck::isWorkspacePointSafe(point);
+}
+bool Kinematics::checkEffectorAnglesBounds(const Vector3& angles) const {
+  return Limits::SafetyCheck::isEffectorAnglesSafe(angles);
 }

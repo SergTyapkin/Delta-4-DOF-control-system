@@ -8,6 +8,8 @@
 #define READ_PIN(pin) digitalRead(pin)
 #define PIN_MODE(pin, mode) pinMode(pin, mode)
 
+#define DRIVER_STEP_TIME_MCS 4
+
 Drive::Drive() :
     drive_id_(0),
     state_(STATE_IDLE),
@@ -257,8 +259,7 @@ bool Drive::startHoming() {
   homing_start_time_ = millis();
   state_ = STATE_HOMING_IN_PROGRESS;
 
-  float homing_velocity = (config_.homing_velocity > 0) ?
-                          config_.homing_velocity : config_.max_velocity * 0.3f;
+  float homing_velocity = (config_.homing_velocity > 0) ? config_.homing_velocity : config_.max_velocity * 0.3f;
 
   switch (config_.homing_direction) {
     case HOMING_POSITIVE:
@@ -267,7 +268,6 @@ bool Drive::startHoming() {
       break;
 
     case HOMING_NEGATIVE:
-    case HOMING_TO_LIMIT:
       direction_ = false;
       motion_params_.target_velocity = -homing_velocity;
       break;
@@ -375,7 +375,7 @@ void Drive::updateStepGenerator() {
 
 void Drive::generateStep() {
   SET_PIN(config_.step_pin, HIGH);
-  delayMicroseconds(2);
+  delayMicroseconds(DRIVER_STEP_TIME_MCS);
   SET_PIN(config_.step_pin, LOW);
 
   steps_remaining_--;
@@ -448,13 +448,13 @@ void Drive::updateVelocityProfile() {
 }
 
 float Drive::stepsToRadians(int32_t steps) const {
-  float steps_per_rad = (config_.steps_per_revolution * config_.microsteps *
+  float steps_per_rad = (config_.steps_per_revolution * config_.microsteps_per_revolution *
                          config_.gear_ratio) / MathUtils::TWO_PI;
   return steps / steps_per_rad;
 }
 
 int32_t Drive::radiansToSteps(float radians) const {
-  float steps_per_rad = (config_.steps_per_revolution * config_.microsteps *
+  float steps_per_rad = (config_.steps_per_revolution * config_.microsteps_per_revolution *
                          config_.gear_ratio) / MathUtils::TWO_PI;
   return (int32_t)(radians * steps_per_rad + 0.5f);
 }
@@ -463,8 +463,7 @@ uint32_t Drive::calculateStepInterval(float velocity_rad_s) const {
   if (velocity_rad_s <= 0.001f) return 0;
 
   float steps_per_sec = velocity_rad_s *
-                        (config_.steps_per_revolution * config_.microsteps * config_.gear_ratio) /
-                        6.283185307f;
+                        (config_.steps_per_revolution * config_.microsteps_per_revolution * config_.gear_ratio) / MathUtils::TWO_PI;
 
   return (steps_per_sec > 0) ? (uint32_t)(1000000.0f / steps_per_sec) : 0;
 }

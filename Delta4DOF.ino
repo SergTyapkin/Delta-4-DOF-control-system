@@ -7,6 +7,7 @@
 #include "config/pins_config.h"
 #include "config/robot_params.h"
 #include "config/limits.h"
+#include "config/system.h"
 
 // ============================================================================
 // Глобальные экземпляры компонентов системы
@@ -22,7 +23,7 @@ EmergencySystem emergencySys;
 Core robotCore;
 
 // 4. Пользовательский интерфейс - взаимодействие с оператором
-UI userInterface;
+UserInterface UI;
 
 // ============================================================================
 // Объявления функций задач для планировщика
@@ -85,13 +86,13 @@ bool uiTask(void* context) {
   uint32_t current_time = millis();
 
   if (current_time - last_execution >= 50) { // 50 мс = 20 Гц
-    userInterface.update();
+    UI.update();
 
     // Периодическая отправка состояния (раз в секунду)
     static uint32_t last_state_send = 0;
     if (current_time - last_state_send > 1000) {
       RobotState state = robotCore.getState();
-      userInterface.sendState(state);
+      UI.sendState(state);
       last_state_send = current_time;
     }
     last_execution = current_time;
@@ -132,7 +133,7 @@ void emergencyCallback(EmergencySystem::ErrorCode error, void* context) {
   taskSheduler.emergencyStop();
 
   // Отправляем сообщение в UI
-  userInterface.sendMessage("EMERGENCY STOP ACTIVATED", true);
+  UI.sendMessage("EMERGENCY STOP ACTIVATED", true);
 
   // Здесь можно добавить дополнительные действия:
   // - Запись лога
@@ -191,20 +192,20 @@ Drive::Config createDriveConfig(uint8_t drive_index) {
 
   // Общие параметры приводов
   config.steps_per_revolution = RobotParams::STEPS_PER_REVOLUTION;
-  config.microsteps = RobotParams::MICROSTEPS;
+  config.microsteps_per_revolution = RobotParams::MICROSTEPS_PER_REVOLUTION;
   config.gear_ratio = RobotParams::GEAR_RATIO;
 
-  config.max_velocity = 5.0f; // рад/с
-  config.max_acceleration = 20.0f; // рад/с²
+  config.max_velocity = Limits::DRIVERS.max_joint_velocity; // рад/с
+  config.max_acceleration = Limits::DRIVERS.max_joint_acceleration; // рад/с²
 
-  config.homing_velocity = 1.0f; // рад/с
-  config.homing_acceleration = 5.0f; // рад/с²
-  config.homing_direction = Drive::HOMING_NEGATIVE;
+  config.homing_velocity = Limits::DRIVERS.homing_velocity; // рад/с
+  config.homing_acceleration = Limits::DRIVERS.homing_acceleration; // рад/с²
+  config.homing_direction = Limits::DRIVERS.homing_direction;
 
   //config.run_current = 1.5f; // А
   //config.hold_current = 0.8f; // А
 
-  config.backlash_compensation = 0.001f; // рад
+  config.backlash_compensation = Limits::DRIVERS.backlash_compensation; // рад
   config.invert_direction = false;
 
   return config;
@@ -220,27 +221,12 @@ DrivesController::Config createDrivesControllerConfig() {
   config.drive_configs[2] = createDriveConfig(2);
   config.drive_configs[3] = createDriveConfig(3);
 
-  config.sync_tolerance = 0.01f; // рад
-  config.sync_timeout = 5000; // мс
-  config.enable_sync_move = true;
-  config.stop_on_single_error = true;
-
   return config;
 }
 
 // Конфигурация кинематики
-DeltaSolver::DeltaConfig createKinematicsConfig() {
-  DeltaSolver::DeltaConfig config;
-
-  config.base_radius = RobotParams::BASE_RADIUS;
-  config.effector_radius = RobotParams::EFFECTOR_RADIUS;
-  config.arm_length = RobotParams::ARM_LENGTH;
-  config.forearm_length = RobotParams::FOREARM_LENGTH;
-
-  for (int i = 0; i < RobotParams::MOTORS_COUNT; i++) {
-    config.base_angles[i] = RobotParams::BASE_ANGLES[i] * (M_PI / 180.0f);
-  }
-
+Kinematics::DeltaConfig createKinematicsConfig() {
+  Kinematics::DeltaConfig config;
   return config;
 }
 
@@ -251,22 +237,17 @@ Core::Config createCoreConfig() {
   config.kinematics_config = createKinematicsConfig();
   config.drives_config = createDrivesControllerConfig();
 
-  config.default_velocity = Limits::VELOCITY.max_linear_velocity * 0.3f;
-  config.default_acceleration = Limits::VELOCITY.max_linear_acceleration * 0.3f;
-  config.max_jerk = Limits::VELOCITY.max_jerk;
-  config.trajectory_update_rate = 100.0f; // Гц
-
   return config;
 }
 
 // Конфигурация пользовательского интерфейса
-UI::Config createUIConfig() {
-  UI::Config config;
+UserInterface::Config createUIConfig() {
+  UserInterface::Config config;
 
-  config.update_interval = 50; // мс
-  config.command_timeout = 10000; // мс (10 сек)
-  config.echo_commands = true;
-  config.debug_mode = false;
+  config.update_interval = System::INTERVAL_UPDATE_UI_MCS;
+  config.command_timeout = Limits::TIME.max_task_time;
+  config.echo_commands = System::UI_ECHO_COMMANDS_TO_SERIAL;
+  config.debug_mode = System::UI_DEBUG_TO_SERIAL;
 
   return config;
 }
@@ -299,8 +280,8 @@ bool initializeSystem() {
 
   // Шаг 3: Инициализация пользовательского интерфейса
   Logger::info("Step 3: Initializing User Interface...");
-  UI::Config ui_config = createUIConfig();
-  userInterface.init(&robotCore, ui_config);
+  UserInterface::Config ui_config = createUIConfig();
+  UI.init(&robotCore, ui_config);
   Logger::info("User Interface: READY");
 
   // Шаг 4: Настройка планировщика задач
@@ -308,21 +289,19 @@ bool initializeSystem() {
   taskSheduler.init();
 
   // Добавление задач с приоритетами:
-  // 10 (высший) - 1 (низший)
-
   // Критические задачи
-  taskSheduler.addTask(safetyTask, nullptr, 1, Sheduler::PRIORITY_CRITICAL);
+  taskSheduler.addTask(safetyTask, nullptr, System::INTERVAL_UPDATE_SHEDULER_MCS, Sheduler::PRIORITY_CRITICAL);
 
   // Высокоприоритетные задачи (управление)
-  taskSheduler.addTask(drivesControlTask, nullptr, 2, Sheduler::PRIORITY_HIGH);
+  taskSheduler.addTask(drivesControlTask, nullptr, System::INTERVAL_UPDATE_DRIVES_MCS, Sheduler::PRIORITY_HIGH);
 
   // Среднеприоритетные задачи (планирование)
-  taskSheduler.addTask(kinematicsTask, nullptr, 10, Sheduler::PRIORITY_MEDIUM);
-  taskSheduler.addTask(coreTask, nullptr, 20, Sheduler::PRIORITY_MEDIUM);
+  taskSheduler.addTask(kinematicsTask, nullptr, System::INTERVAL_UPDATE_KINEMATICS_MCS, Sheduler::PRIORITY_MEDIUM);
+  taskSheduler.addTask(coreTask, nullptr, System::INTERVAL_UPDATE_CORE_MCS, Sheduler::PRIORITY_MEDIUM);
 
   // Низкоприоритетные задачи (UI, мониторинг)
-  taskSheduler.addTask(uiTask, nullptr, 50, Sheduler::PRIORITY_LOW);
-  taskSheduler.addTask(monitoringTask, nullptr, 200, Sheduler::PRIORITY_IDLE);
+  taskSheduler.addTask(uiTask, nullptr, System::INTERVAL_UPDATE_UI_MCS, Sheduler::PRIORITY_LOW);
+  taskSheduler.addTask(monitoringTask, nullptr, System::INTERVAL_UPDATE_MONITORING_MCS, Sheduler::PRIORITY_IDLE);
 
   Logger::info("Task Sheduler: READY (%d tasks configured)", taskSheduler.getTaskCount());
 
@@ -349,22 +328,20 @@ bool performStartupSequence() {
 
   // Шаг 3: Выполнение homing
   Logger::info("Step 3: Performing homing sequence...");
-
-  userInterface.sendMessage("Starting homing sequence...", false);
+  UI.sendMessage("Starting homing sequence...", false);
 
   bool homing_success = robotCore.performHoming();
   if (!homing_success) {
     Logger::error("Homing failed!");
-    userInterface.sendMessage("HOMING FAILED!", true);
+    UI.sendMessage("HOMING FAILED!", true);
     return false;
   }
 
   // Ожидание завершения homing
   uint32_t homing_start = millis();
-  const uint32_t HOMING_TIMEOUT = 30000; // 30 секунд
 
   while (!robotCore.isHomed() && !emergencySys.isEmergencyActive()) {
-    if (millis() - homing_start > HOMING_TIMEOUT) {
+    if (millis() - homing_start > Limits::TIME.homing_timeout) {
       Logger::error("Homing timeout!");
       emergencySys.triggerEmergency(EmergencySystem::ErrorCode::HOMING_FAILED);
       return false;
@@ -378,21 +355,21 @@ bool performStartupSequence() {
   }
 
   Logger::info("Homing: COMPLETE");
-  userInterface.sendMessage("Homing completed successfully", false);
+  UI.sendMessage("Homing completed successfully", false);
 
   // Шаг 4: Переход в рабочее положение
   Logger::info("Step 4: Moving to ready position...");
 
   // Двигаемся в безопасную стартовую позицию
-  Vector3 ready_position(0, 0, -500); // Посередине по Z
-  if (!robotCore.moveToPoint(ready_position, 30.0f)) {
-    Logger::warning("Failed to move to ready position");
+  if (!robotCore.moveToPosition(RobotParams::SAFE_START_POSITION)) {
+    Logger::warning("Failed to move to default ready position");
   } else {
     // Ждем завершения движения (упрощенно)
     delay(2000);
   }
 
   Logger::info("Startup sequence: COMPLETE");
+  UI.sendMessage("Startup complete", false);
   return true;
 }
 
@@ -416,7 +393,7 @@ void emergencyRecovery() {
   // 4. Повторный homing
   if (performStartupSequence()) {
     Logger::info("EMERGENCY RECOVERY SUCCESSFUL");
-    userInterface.sendMessage("System recovered from emergency", false);
+    UI.sendMessage("System recovered from emergency", false);
   } else {
     Logger::error("EMERGENCY RECOVERY FAILED");
   }
@@ -439,8 +416,7 @@ void runDiagnostics() {
 
   // 3. Проверка кинематики
   Logger::info("Kinematics test:");
-  Vector3 test_point(0, 0, -500);
-  if (robotCore.moveToPoint(test_point, 10.0f)) {
+  if (robotCore.moveToPosition(RobotParams::SAFE_START_POSITION)) {
     Logger::info("  Test movement: OK");
   } else {
     Logger::error("  Test movement: FAILED");
@@ -556,7 +532,7 @@ void setup() {
     Logger::info("========================================");
     Logger::info("");
 
-    userInterface.sendMessage("SYSTEM READY - Type 'help' for commands", false);
+    UI.sendMessage("SYSTEM READY - Type 'help' for commands", false);
 
     // Включение светодиода готовности
     digitalWrite(Pins::Status::LED_READY, HIGH);

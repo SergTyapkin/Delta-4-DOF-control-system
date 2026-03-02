@@ -13,12 +13,12 @@ Core::Core() :
     current_command_id_(0),
     current_command_start_time_(0),
     command_history_index_(0),
-    trajectory_points_count_(0),
-    current_trajectory_point_(0),
+    trajectory_positions_count_(0),
+    current_trajectory_position_(0),
     trajectory_in_progress_(false),
     last_update_time_(0),
     last_state_update_time_(0),
-    trajectory_update_interval_(10),
+    teach_positions_count_(0),
     state_update_callback_(nullptr),
     state_update_context_(nullptr),
     command_complete_callback_(nullptr),
@@ -75,11 +75,10 @@ bool Core::init(const Config& config) {
   // Инициализация генератора траекторий
   trajectory_generator_.setMaxVelocity(config_.default_velocity);
   trajectory_generator_.setMaxAcceleration(config_.default_acceleration);
-  trajectory_update_interval_ = (uint32_t)(1000.0f / config_.trajectory_update_rate);
 
   // Инициализация состояния робота
   robot_state_.status = RobotState::STATUS_IDLE;
-  robot_state_.effector_position = Vector3(0, 0, 0);
+  robot_state_.effector_position = Vector6(0, 0, 0, 0, 0, 0);
   robot_state_.joint_positions[0] = 0;
   robot_state_.joint_positions[1] = 0;
   robot_state_.joint_positions[2] = 0;
@@ -96,7 +95,7 @@ bool Core::init(const Config& config) {
   Logger::info("Core system initialized successfully");
   Logger::info("Default velocity: %.1f mm/s", config_.default_velocity);
   Logger::info("Default acceleration: %.1f mm/s²", config_.default_acceleration);
-  Logger::info("Trajectory update rate: %.1f Hz", config_.trajectory_update_rate);
+  Logger::info("Trajectory updates every: %.1f mcs", config_.trajectory_update_interval);
 
   return true;
 }
@@ -183,10 +182,10 @@ void Core::clearCommandQueue() {
   Logger::info("Command queue cleared");
 }
 
-bool Core::moveToPoint(const Vector3& point, float velocity, TrajectoryGenerator::TrajectoryType traj_type) {
+bool Core::moveToPosition(const Vector6& position, float velocity, TrajectoryGenerator::TrajectoryType traj_type) {
   Command cmd;
   cmd.type = Command::CMD_MOVE_TO_POINT;
-  cmd.target_point = point;
+  cmd.target_position = position;
   cmd.velocity = (velocity > 0) ? velocity : config_.default_velocity;
   cmd.trajectory_type = traj_type;
 
@@ -203,11 +202,6 @@ bool Core::moveJoints(const float angles[RobotParams::MOTORS_COUNT], float veloc
   cmd.velocity = (velocity > 0) ? velocity : config_.default_velocity;
 
   return (executeCommand(cmd) != 0);
-}
-
-bool Core::setCartesianVelocity(const Vector3& velocity) {
-  Logger::warning("Cartesian velocity control not yet implemented");
-  return false;
 }
 
 bool Core::setJointVelocity(const float velocities[RobotParams::MOTORS_COUNT]) {
@@ -232,10 +226,10 @@ bool Core::calibrate() {
   return performHoming();
 }
 
-bool Core::setHomePosition(const Vector3& home_point) {
+bool Core::setHomePosition(const Vector6& home_point) {
   Command cmd;
   cmd.type = Command::CMD_SET_HOME;
-  cmd.target_point = home_point;
+  cmd.target_position = home_point;
 
   return (executeCommand(cmd) != 0);
 }
@@ -305,7 +299,7 @@ Core::CommandStatus Core::getCommandStatus(uint32_t command_id) const {
   return STATUS_PENDING;
 }
 
-Vector3 Core::getCurrentPosition() const {
+Vector6 Core::getCurrentEffectorPosition() const {
   return robot_state_.effector_position;
 }
 
@@ -329,10 +323,8 @@ bool Core::isReady() const {
   return (is_initialized_ && is_homed_ && mode_ != MODE_ERROR);
 }
 
-bool Core::startTrajectory(const Vector3& start, const Vector3& end,
-                           TrajectoryGenerator::TrajectoryType type, float velocity) {
-
-  if (!checkPointSafety(start) || !checkPointSafety(end)) {
+bool Core::startTrajectory(const Vector6& start, const Vector6& end, TrajectoryGenerator::TrajectoryType type, float velocity) {
+  if (!checkPositionSafety(start) || !checkPositionSafety(end)) {
     Logger::error("Trajectory points are not safe");
     return false;
   }
@@ -347,7 +339,7 @@ bool Core::startTrajectory(const Vector3& start, const Vector3& end,
   }
 
   trajectory_in_progress_ = true;
-  current_trajectory_point_ = 0;
+  current_trajectory_position_ = 0;
   mode_ = MODE_TRAJECTORY;
 
   Logger::info("Trajectory started: %s type, %.1f mm/s",
@@ -357,46 +349,55 @@ bool Core::startTrajectory(const Vector3& start, const Vector3& end,
   return true;
 }
 
-bool Core::addTrajectoryPoint(const Vector3& point) {
-  if (!checkPointSafety(point)) {
+bool Core::addTrajectoryPoint(const Vector6& position) {
+  if (!checkPositionSafety(position)) {
     return false;
   }
 
-  if (trajectory_points_count_ >= MAX_TRAJECTORY_POINTS) {
+  if (trajectory_positions_count_ >= MAX_TRAJECTORY_POINTS) {
     Logger::warning("Max trajectory points reached");
     return false;
   }
 
-  trajectory_points_[trajectory_points_count_] = point;
-  trajectory_points_count_++;
+  trajectory_positions_[trajectory_positions_count_] = position;
+  trajectory_positions_count_++;
   return true;
 }
 
 bool Core::clearTrajectory() {
-  trajectory_points_count_ = 0;
+  trajectory_positions_count_ = 0;
   trajectory_in_progress_ = false;
   return true;
 }
 
-bool Core::teachPoint(const Vector3& point, uint32_t point_id) {
+bool Core::teachPosition(const Vector6& position, uint32_t point_id) {
   if (!isReady()) {
     Logger::error("Cannot teach point: system not ready");
     return false;
   }
 
-  if (teach_points_count_ >= MAX_TEACH_POINTS) {
+  if (teach_positions_count_ >= MAX_TEACH_POINTS) {
     Logger::warning("Max teach points reached");
     return false;
   }
 
-  teach_points_[teach_points_count_].id = point_id;
-  teach_points_[teach_points_count_].point = point;
-  teach_points_count_++;
+  teach_positions_[teach_positions_count_].id = point_id;
+  teach_positions_[teach_positions_count_].position = position;
+  teach_positions_count_++;
 
-  Logger::info("Point %d taught: (%.1f, %.1f, %.1f)",
-               point_id, point.x, point.y, point.z);
+  Logger::info("Point #%d taught: (%.1f, %.1f, %.1f)/[%.1f, %.1f, %.1f]",
+               point_id, position.x, position.y, position.z, position.ax, position.ay, position.az);
 
   return true;
+}
+
+bool Core::loadPoint(uint32_t point_id, float velocity) {
+  Command cmd;
+  cmd.type = Command::CMD_LOAD_POINT;
+  cmd.id = point_id;
+  cmd.velocity = velocity;
+
+  return (executeCommand(cmd) == 0);
 }
 
 void Core::processCommandQueue() {
@@ -410,7 +411,7 @@ void Core::processCommandQueue() {
       CommandResult result;
       result.command_id = current_command_.id;
       result.status = STATUS_FAILED;
-      result.error_code = 1001;
+      result.error_code = 11;
       strcpy(result.error_message, "Command timeout");
       result.execution_time = millis() - current_command_start_time_;
 
@@ -469,7 +470,11 @@ void Core::executeCurrentCommand() {
       break;
 
     case Command::CMD_TEACH_POINT:
-      success = handleTeachPoint(current_command_);
+      success = handleTeachPosition(current_command_);
+      break;
+
+    case Command::CMD_LOAD_POINT:
+      success = handleLoadPoint(current_command_);
       break;
 
     case Command::CMD_STOP:
@@ -497,7 +502,7 @@ void Core::executeCurrentCommand() {
       break;
 
     default:
-      error_code = 1002;
+      error_code = 12;
       error_message = "Unknown command type";
       Logger::error("Unknown command type: %d", current_command_.type);
       break;
@@ -528,23 +533,23 @@ void Core::executeCurrentCommand() {
 
 void Core::updateState() {
   // Обновляем углы шарниров от контроллера приводов
-  float positions[RobotParams::MOTORS_COUNT], velocities[RobotParams::MOTORS_COUNT];
-  drives_controller_.getPositions(positions);
-  drives_controller_.getVelocities(velocities);
+  float joints_angles[RobotParams::MOTORS_COUNT], joints_velocities[RobotParams::MOTORS_COUNT];
+  drives_controller_.getPositions(joints_angles);
+  drives_controller_.getVelocities(joints_velocities);
 
-  robot_state_.joint_positions[0] = positions[0];
-  robot_state_.joint_positions[1] = positions[1];
-  robot_state_.joint_positions[2] = positions[2];
-  robot_state_.joint_positions[3] = positions[3];
+  robot_state_.joint_positions[0] = joints_angles[0];
+  robot_state_.joint_positions[1] = joints_angles[1];
+  robot_state_.joint_positions[2] = joints_angles[2];
+  robot_state_.joint_positions[3] = joints_angles[3];
 
-  robot_state_.joint_velocities[0] = velocities[0];
-  robot_state_.joint_velocities[1] = velocities[1];
-  robot_state_.joint_velocities[2] = velocities[2];
-  robot_state_.joint_velocities[3] = velocities[3];
+  robot_state_.joint_velocities[0] = joints_velocities[0];
+  robot_state_.joint_velocities[1] = joints_velocities[1];
+  robot_state_.joint_velocities[2] = joints_velocities[2];
+  robot_state_.joint_velocities[3] = joints_velocities[3];
 
   // Обновляем позицию эффектора через прямую кинематику
-  Vector3 effector_position;
-  if (kinematics_.forwardKinematics(positions, effector_position)) {
+  Vector6 effector_position;
+  if (kinematics_.forwardKinematics(joints_angles, effector_position)) {
     robot_state_.effector_position = effector_position;
   } else {
     Logger::warning("Failed to compute forward kinematics");
@@ -568,15 +573,15 @@ void Core::updateTrajectory() {
   static uint32_t last_trajectory_update = 0;
   uint32_t current_time = millis();
 
-  if (current_time - last_trajectory_update < trajectory_update_interval_) {
+  if (current_time - last_trajectory_update < config_.trajectory_update_interval) {
     return;
   }
 
-  Vector3 next_point;
-  if (trajectory_generator_.getNextPoint(next_point, trajectory_update_interval_)) {
+  Vector6 next_position;
+  if (trajectory_generator_.getNextPoint(next_position, config_.trajectory_update_interval)) {
     // Двигаемся к следующей точке траектории
     float joint_angles[RobotParams::MOTORS_COUNT];
-    if (convertToJointAngles(next_point, joint_angles)) {
+    if (solveJointAnglesForPosition(next_position, joint_angles)) {
       // Используем прямой контроль шарниров для точности
       DrivesController::Command cmd;
       cmd.type = DrivesController::Command::MOVE_TO_POSITION_SYNC;
@@ -602,18 +607,18 @@ void Core::updateTrajectory() {
 }
 
 bool Core::handleMoveToPoint(const Command& cmd) {
-  if (!checkPointSafety(cmd.target_point)) {
-    logCommand(cmd, STATUS_FAILED, 2001, "Point not safe");
+  if (!checkPositionSafety(cmd.target_position)) {
+    logCommand(cmd, STATUS_FAILED, 2001, "Position not safe");
     return false;
   }
 
-  float joint_angles[RobotParams::MOTORS_COUNT];
-  if (!convertToJointAngles(cmd.target_point, joint_angles)) {
-    logCommand(cmd, STATUS_FAILED, 2002, "IK solution not found");
+  float joints_angles[RobotParams::MOTORS_COUNT];
+  if (!solveJointAnglesForPosition(cmd.target_position, joints_angles)) {
+    logCommand(cmd, STATUS_FAILED, 2002, "Inverse kinematics solution not found");
     return false;
   }
 
-  if (!checkJointSafety(joint_angles)) {
+  if (!checkJointsPositionsZSafety(joints_angles)) {
     logCommand(cmd, STATUS_FAILED, 2003, "Joint angles not safe");
     return false;
   }
@@ -623,10 +628,10 @@ bool Core::handleMoveToPoint(const Command& cmd) {
 
   DrivesController::Command drive_cmd;
   drive_cmd.type = DrivesController::Command::MOVE_TO_POSITION_SYNC;
-  drive_cmd.positions[0] = joint_angles[0];
-  drive_cmd.positions[1] = joint_angles[1];
-  drive_cmd.positions[2] = joint_angles[2];
-  drive_cmd.positions[3] = joint_angles[3];
+  drive_cmd.positions[0] = joints_angles[0];
+  drive_cmd.positions[1] = joints_angles[1];
+  drive_cmd.positions[2] = joints_angles[2];
+  drive_cmd.positions[3] = joints_angles[3];
   drive_cmd.velocities[0] = drive_cmd.velocities[1] = drive_cmd.velocities[2] = drive_cmd.velocities[3] =
    cmd.velocity > 0 ? cmd.velocity : config_.default_velocity;
 
@@ -642,10 +647,10 @@ bool Core::handleMoveToPoint(const Command& cmd) {
 }
 
 bool Core::handleMoveJoints(const Command& cmd) {
-  if (!checkJointSafety(cmd.joint_angles)) {
-    logCommand(cmd, STATUS_FAILED, 2101, "Joint angles not safe");
-    return false;
-  }
+//  if (!checkJointsPositionsZSafety(cmd.joint_angles)) {
+//    logCommand(cmd, STATUS_FAILED, 2101, "Joint angles not safe");
+//    return false;
+//  }
 
   mode_ = MODE_DIRECT_JOINT;
 
@@ -671,9 +676,9 @@ bool Core::handleMoveJoints(const Command& cmd) {
 
 bool Core::handleExecuteTrajectory(const Command& cmd) {
   // Для простоты используем прямолинейную траекторию от текущей точки
-  Vector3 current_pos = getCurrentPosition();
+  Vector6 current_pos = getCurrentEffectorPosition();
 
-  if (!startTrajectory(current_pos, cmd.target_point,
+  if (!startTrajectory(current_pos, cmd.target_position,
                        cmd.trajectory_type, cmd.velocity)) {
     logCommand(cmd, STATUS_FAILED, 2201, "Failed to start trajectory");
     return false;
@@ -683,8 +688,8 @@ bool Core::handleExecuteTrajectory(const Command& cmd) {
   return true;
 }
 
-bool Core::handleTeachPoint(const Command& cmd) {
-  if (!teachPoint(cmd.target_point, cmd.id)) {
+bool Core::handleTeachPosition(const Command& cmd) {
+  if (!teachPosition(cmd.target_position, cmd.id)) {
     logCommand(cmd, STATUS_FAILED, 2301, "Failed to teach point");
     return false;
   }
@@ -707,6 +712,24 @@ bool Core::handleTeachPoint(const Command& cmd) {
   current_command_status_ = STATUS_COMPLETED;
 
   return true;
+}
+
+bool Core::handleLoadPoint(const Command& cmd) {
+  if (!isReady()) {
+    Logger::error("Cannot load point: system not ready");
+    return false;
+  }
+
+  for (uint32_t i = 0; i < teach_positions_count_; i++) {
+    const TeachPosition point = teach_positions_[i];
+    if (point.id == cmd.id) {
+      Logger::info("Point #%d loaded (%.1f, %.1f, %.1f)/[%.1f, %.1f, %.1f]",
+                   point.id, point.position.x, point.position.y, point.position.z, point.position.ax, point.position.ay, point.position.az);
+      return moveToPosition(point.position, cmd.velocity);
+    }
+  }
+
+  return false;
 }
 
 bool Core::handleStop(const Command& cmd) {
@@ -771,7 +794,7 @@ bool Core::handleEmergencyStop(const Command& cmd) {
   drives_controller_.emergencyStop();
   trajectory_in_progress_ = false;
   mode_ = MODE_ERROR;
-  robot_state_.error_code = 9000;
+  robot_state_.error_code = 90;
   strcpy(robot_state_.error_message, "Emergency stop");
 
   CommandResult result;
@@ -825,44 +848,50 @@ bool Core::handleCalibrate(const Command& cmd) {
   return success;
 }
 
-bool Core::convertToJointAngles(const Vector3& point, float angles[RobotParams::MOTORS_COUNT]) {
-  DeltaSolver::Solution solution = kinematics_.inverseKinematicsSafe(point);
+bool Core::solveJointAnglesForPosition(const Vector6& position, float joints_angles[RobotParams::MOTORS_COUNT]) {
+  Kinematics::Solution solution = kinematics_.inverseKinematics(position);
 
   if (!solution.valid) {
-    Logger::error("IK failed for point (%.1f, %.1f, %.1f)",
-                  point.x, point.y, point.z);
+    Logger::error("Inverse kinematics failed for point (%.1f, %.1f, %.1f)/[%.1f, %.1f, %.1f]",
+                  position.x, position.y, position.z, position.ax, position.ay, position.az);
     return false;
   }
 
-  angles[0] = solution.angles[0];
-  angles[1] = solution.angles[1];
-  angles[2] = solution.angles[2];
-  angles[3] = solution.angles[3];
+  joints_angles[0] = solution.joints_angles[0];
+  joints_angles[1] = solution.joints_angles[1];
+  joints_angles[2] = solution.joints_angles[2];
+  joints_angles[3] = solution.joints_angles[3];
 
   return true;
 }
 
-bool Core::checkPointSafety(const Vector3& point) {
+bool Core::checkPositionSafety(const Vector6& position) {
   // Проверка рабочего пространства
-  if (!Limits::SafetyCheck::isWorkspacePointSafe(point.x, point.y, point.z)) {
-    Logger::warning("Point (%.1f, %.1f, %.1f) outside workspace",
-                    point.x, point.y, point.z);
+  if (!Limits::SafetyCheck::isWorkspacePointSafe(position.toPosition())) {
+    Logger::warning("Point (%.1f, %.1f, %.1f) outside of the workspace bounds",
+                    position.x, position.y, position.z);
+    return false;
+  }
+  // Проверка углов поворота эффектора
+  if (!Limits::SafetyCheck::isEffectorAnglesSafe(position.toOrientation())) {
+    Logger::warning("Position angles (%.1f, %.1f, %.1f)/[[%.1f, %.1f, %.1f] outside of the effector angles limits",
+                    position.x, position.y, position.z, position.ax, position.ay, position.az);
     return false;
   }
 
   // Проверка через обратную кинематику
-  DeltaSolver::Solution solution = kinematics_.inverseKinematicsSafe(point);
+  Kinematics::Solution solution = kinematics_.inverseKinematics(position);
   if (!solution.valid) {
-    Logger::warning("Point (%.1f, %.1f, %.1f) not reachable",
-                    point.x, point.y, point.z);
+    Logger::warning("Point (%.1f, %.1f, %.1f)/[%.1f, %.1f, %.1f] not reachable",
+                    position.x, position.y, position.z, position.ax, position.ay, position.az);
     return false;
   }
 
   return true;
 }
 
-bool Core::checkJointSafety(const float angles[RobotParams::MOTORS_COUNT]) {
-  return Limits::SafetyCheck::areJointAnglesSafe(angles);
+bool Core::checkJointsPositionsZSafety(const float joints_positions_z[RobotParams::MOTORS_COUNT]) {
+  return Limits::SafetyCheck::arePositionsZSafe(joints_positions_z);
 }
 
 void Core::logCommand(const Command& cmd, CommandStatus status,
@@ -874,6 +903,7 @@ void Core::logCommand(const Command& cmd, CommandStatus status,
     case Command::CMD_MOVE_JOINTS: type_str = "MOVE_JOINTS"; break;
     case Command::CMD_EXECUTE_TRAJECTORY: type_str = "EXECUTE_TRAJECTORY"; break;
     case Command::CMD_TEACH_POINT: type_str = "TEACH_POINT"; break;
+    case Command::CMD_LOAD_POINT: type_str = "LOAD_POINT"; break;
     case Command::CMD_RUN_PROGRAM: type_str = "RUN_PROGRAM"; break;
     case Command::CMD_STOP: type_str = "STOP"; break;
     case Command::CMD_PAUSE: type_str = "PAUSE"; break;
@@ -909,7 +939,7 @@ void Core::onDriveStateChanged(uint8_t index, Drive::State old_state,
     // Если система в режиме движения, переходим в состояние ошибки
     if (mode_ == MODE_CARTESIAN || mode_ == MODE_DIRECT_JOINT || mode_ == MODE_TRAJECTORY) {
       mode_ = MODE_ERROR;
-      robot_state_.error_code = 5000 + index;
+      robot_state_.error_code = 50 + index;
       sprintf(robot_state_.error_message, "Drive %d error", index);
 
       if (error_callback_) {
@@ -936,7 +966,7 @@ void Core::onDrivesHomingComplete(bool success) {
     } else {
       mode_ = MODE_ERROR;
       result.status = STATUS_FAILED;
-      result.error_code = 2502;
+      result.error_code = 25;
       strcpy(result.error_message, "Homing failed");
 
       logCommand(current_command_, STATUS_FAILED, 2502, "Homing failed");
@@ -1026,11 +1056,12 @@ void Core::printStatus() const {
   Logger::info("Current command: ID=%d, Status=%d",
                current_command_.id, current_command_status_);
 
-  Vector3 pos = getCurrentPosition();
+  Vector6 pos = getCurrentEffectorPosition();
   float joints[RobotParams::MOTORS_COUNT];
   getCurrentJoints(joints);
 
-  Logger::info("Position: (%.1f, %.1f, %.1f) mm", pos.x, pos.y, pos.z);
+  Logger::info("Position: (%.1f, %.1f, %.1f mm)/[%.1f, %.1f, %.1f deg]",
+               pos.x, pos.y, pos.z, pos.ax, pos.ay, pos.az);
   Logger::info("Joints: (%.2f, %.2f, %.2f) deg",
                joints[0] * MathUtils::RAD_TO_DEG,
                joints[1] * MathUtils::RAD_TO_DEG,
@@ -1042,16 +1073,12 @@ void Core::printKinematicsInfo() const {
   Logger::info("=== Kinematics Info ===");
 
   const auto& config = kinematics_.getConfig();
-  Logger::info("Base radius: %.1f mm", config.base_radius);
-  Logger::info("Effector radius: %.1f mm", config.effector_radius);
   Logger::info("Arm length: %.1f mm", config.arm_length);
-  Logger::info("Forearm length: %.1f mm", config.forearm_length);
-
-  float min_r, max_r, min_z, max_z;
-  kinematics_.getWorkspaceBounds(min_r, max_r, min_z, max_z);
-
+  Logger::info("Effector height: %.1f mm", config.effector_height);
+  Logger::info("Columns joins positions and effector joints position: (values omitted)");
   Logger::info("Workspace: R=%.1f-%.1f mm, Z=%.1f-%.1f mm",
-               min_r, max_r, min_z, max_z);
+               0, Limits::WORKSPACE.max_x,
+               Limits::WORKSPACE.min_z, Limits::WORKSPACE.max_z);
 }
 
 void Core::printDriveInfo() const {
